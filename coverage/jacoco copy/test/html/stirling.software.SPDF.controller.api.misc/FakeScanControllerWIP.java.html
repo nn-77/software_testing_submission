@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FakeScanControllerWIP.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api.misc</a> &gt; <span class="el_source">FakeScanControllerWIP.java</span></div><h1>FakeScanControllerWIP.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api.misc;
+
+import java.awt.Color;
+import java.awt.geom.AffineTransform;
+import java.awt.image.AffineTransformOp;
+import java.awt.image.BufferedImage;
+import java.awt.image.BufferedImageOp;
+import java.awt.image.ConvolveOp;
+import java.awt.image.Kernel;
+import java.awt.image.RescaleOp;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.security.SecureRandom;
+import java.util.Random;
+
+import javax.imageio.ImageIO;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.rendering.ImageType;
+import org.apache.pdfbox.rendering.PDFRenderer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.github.pixee.security.Filenames;
+import io.swagger.v3.oas.annotations.Hidden;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.PDFFile;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/misc&quot;)
+@Tag(name = &quot;Misc&quot;, description = &quot;Miscellaneous APIs&quot;)
+<span class="nc" id="L47">public class FakeScanControllerWIP {</span>
+
+<span class="nc" id="L49">    private static final Logger logger = LoggerFactory.getLogger(FakeScanControllerWIP.class);</span>
+
+    // TODO
+    @Hidden
+    // @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/fakeScan&quot;)
+    @Operation(
+            summary = &quot;Repair a PDF file&quot;,
+            description =
+                    &quot;This endpoint repairs a given PDF file by running Ghostscript command. The PDF is first saved to a temporary location, repaired, read back, and then returned as a response.&quot;)
+    public ResponseEntity&lt;byte[]&gt; repairPdf(@ModelAttribute PDFFile request) throws IOException {
+<span class="nc" id="L59">        MultipartFile inputFile = request.getFileInput();</span>
+
+<span class="nc" id="L61">        PDDocument document = Loader.loadPDF(inputFile.getBytes());</span>
+<span class="nc" id="L62">        PDFRenderer pdfRenderer = new PDFRenderer(document);</span>
+<span class="nc" id="L63">        pdfRenderer.setSubsamplingAllowed(true);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        for (int page = 0; page &lt; document.getNumberOfPages(); ++page) {</span>
+<span class="nc" id="L65">            BufferedImage image = pdfRenderer.renderImageWithDPI(page, 300, ImageType.RGB);</span>
+<span class="nc" id="L66">            ImageIO.write(image, &quot;png&quot;, new File(&quot;scanned-&quot; + (page + 1) + &quot;.png&quot;));</span>
+        }
+<span class="nc" id="L68">        document.close();</span>
+
+        // Constants
+<span class="nc" id="L71">        int scannedness = 90; // Value between 0 and 100</span>
+<span class="nc" id="L72">        int dirtiness = 0; // Value between 0 and 100</span>
+
+        // Load the source image
+<span class="nc" id="L75">        BufferedImage sourceImage = ImageIO.read(new File(&quot;scanned-1.png&quot;));</span>
+
+        // Create the destination image
+<span class="nc" id="L78">        BufferedImage destinationImage =</span>
+                new BufferedImage(
+<span class="nc" id="L80">                        sourceImage.getWidth(), sourceImage.getHeight(), sourceImage.getType());</span>
+
+        // Apply a brightness and contrast effect based on the &quot;scanned-ness&quot;
+<span class="nc" id="L83">        float scaleFactor = 1.0f + (scannedness / 100.0f) * 0.5f; // Between 1.0 and 1.5</span>
+<span class="nc" id="L84">        float offset = scannedness * 1.5f; // Between 0 and 150</span>
+<span class="nc" id="L85">        BufferedImageOp op = new RescaleOp(scaleFactor, offset, null);</span>
+<span class="nc" id="L86">        op.filter(sourceImage, destinationImage);</span>
+
+        // Apply a rotation effect
+<span class="nc" id="L89">        double rotationRequired =</span>
+<span class="nc" id="L90">                Math.toRadians(</span>
+<span class="nc" id="L91">                        (new SecureRandom().nextInt(3 - 1)</span>
+                                + 1)); // Random angle between 1 and 3 degrees
+<span class="nc" id="L93">        double locationX = destinationImage.getWidth() / 2;</span>
+<span class="nc" id="L94">        double locationY = destinationImage.getHeight() / 2;</span>
+<span class="nc" id="L95">        AffineTransform tx =</span>
+<span class="nc" id="L96">                AffineTransform.getRotateInstance(rotationRequired, locationX, locationY);</span>
+<span class="nc" id="L97">        AffineTransformOp rotateOp = new AffineTransformOp(tx, AffineTransformOp.TYPE_BILINEAR);</span>
+<span class="nc" id="L98">        destinationImage = rotateOp.filter(destinationImage, null);</span>
+
+        // Apply a blur effect based on the &quot;scanned-ness&quot;
+<span class="nc" id="L101">        float blurIntensity = scannedness / 100.0f * 0.2f; // Between 0.0 and 0.2</span>
+<span class="nc" id="L102">        float[] matrix = {</span>
+            blurIntensity, blurIntensity, blurIntensity,
+            blurIntensity, blurIntensity, blurIntensity,
+            blurIntensity, blurIntensity, blurIntensity
+        };
+<span class="nc" id="L107">        BufferedImageOp blurOp =</span>
+                new ConvolveOp(new Kernel(3, 3, matrix), ConvolveOp.EDGE_NO_OP, null);
+<span class="nc" id="L109">        destinationImage = blurOp.filter(destinationImage, null);</span>
+
+        // Add noise to the image based on the &quot;dirtiness&quot;
+<span class="nc" id="L112">        Random random = new SecureRandom();</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        for (int y = 0; y &lt; destinationImage.getHeight(); y++) {</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            for (int x = 0; x &lt; destinationImage.getWidth(); x++) {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                if (random.nextInt(100) &lt; dirtiness) {</span>
+                    // Change the pixel color to black randomly based on the &quot;dirtiness&quot;
+<span class="nc" id="L117">                    destinationImage.setRGB(x, y, Color.BLACK.getRGB());</span>
+                }
+            }
+        }
+
+        // Save the image
+<span class="nc" id="L123">        ImageIO.write(destinationImage, &quot;PNG&quot;, new File(&quot;scanned-1.png&quot;));</span>
+
+<span class="nc" id="L125">        PDDocument documentOut = new PDDocument();</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        for (int page = 1; page &lt;= document.getNumberOfPages(); ++page) {</span>
+<span class="nc" id="L127">            BufferedImage bim = ImageIO.read(new File(&quot;scanned-&quot; + page + &quot;.png&quot;));</span>
+
+            // Adjust the dimensions of the page
+<span class="nc" id="L130">            PDPage pdPage = new PDPage(new PDRectangle(bim.getWidth() - 1, bim.getHeight() - 1));</span>
+<span class="nc" id="L131">            documentOut.addPage(pdPage);</span>
+
+<span class="nc" id="L133">            PDImageXObject pdImage = LosslessFactory.createFromImage(documentOut, bim);</span>
+<span class="nc" id="L134">            PDPageContentStream contentStream = new PDPageContentStream(documentOut, pdPage);</span>
+
+            // Draw the image with a slight offset and enlarged dimensions
+<span class="nc" id="L137">            contentStream.drawImage(pdImage, -1, -1, bim.getWidth() + 2, bim.getHeight() + 2);</span>
+<span class="nc" id="L138">            contentStream.close();</span>
+        }
+<span class="nc" id="L140">        ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L141">        documentOut.save(baos);</span>
+<span class="nc" id="L142">        documentOut.close();</span>
+
+        // Return the optimized PDF as a response
+<span class="nc" id="L145">        String outputFilename =</span>
+<span class="nc" id="L146">                Filenames.toSimpleFileName(inputFile.getOriginalFilename())</span>
+<span class="nc" id="L147">                                .replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                        + &quot;_scanned.pdf&quot;;
+<span class="nc" id="L149">        return WebResponseUtils.boasToWebResponse(baos, outputFilename);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

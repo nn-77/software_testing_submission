@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextFinder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.pdf</a> &gt; <span class="el_source">TextFinder.java</span></div><h1>TextFinder.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.pdf;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.TextPosition;
+
+import stirling.software.SPDF.model.PDFText;
+
+public class TextFinder extends PDFTextStripper {
+
+    private final String searchText;
+    private final boolean useRegex;
+    private final boolean wholeWordSearch;
+<span class="nc" id="L20">    private final List&lt;PDFText&gt; textOccurrences = new ArrayList&lt;&gt;();</span>
+
+    private class MatchInfo {
+        int startIndex;
+        int matchLength;
+
+<span class="nc" id="L26">        MatchInfo(int startIndex, int matchLength) {</span>
+<span class="nc" id="L27">            this.startIndex = startIndex;</span>
+<span class="nc" id="L28">            this.matchLength = matchLength;</span>
+<span class="nc" id="L29">        }</span>
+    }
+
+    public TextFinder(String searchText, boolean useRegex, boolean wholeWordSearch)
+<span class="nc" id="L33">            throws IOException {</span>
+<span class="nc" id="L34">        this.searchText = searchText.toLowerCase();</span>
+<span class="nc" id="L35">        this.useRegex = useRegex;</span>
+<span class="nc" id="L36">        this.wholeWordSearch = wholeWordSearch;</span>
+<span class="nc" id="L37">        setSortByPosition(true);</span>
+<span class="nc" id="L38">    }</span>
+
+    private List&lt;MatchInfo&gt; findOccurrencesInText(String searchText, String content) {
+<span class="nc" id="L41">        List&lt;MatchInfo&gt; matches = new ArrayList&lt;&gt;();</span>
+
+        Pattern pattern;
+
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (useRegex) {</span>
+            // Use regex-based search
+            pattern =
+<span class="nc bnc" id="L48" title="All 2 branches missed.">                    wholeWordSearch</span>
+<span class="nc" id="L49">                            ? Pattern.compile(&quot;\\b&quot; + searchText + &quot;\\b&quot;)</span>
+<span class="nc" id="L50">                            : Pattern.compile(searchText);</span>
+        } else {
+            // Use normal text search
+            pattern =
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                    wholeWordSearch</span>
+<span class="nc" id="L55">                            ? Pattern.compile(&quot;\\b&quot; + Pattern.quote(searchText) + &quot;\\b&quot;)</span>
+<span class="nc" id="L56">                            : Pattern.compile(Pattern.quote(searchText));</span>
+        }
+
+<span class="nc" id="L59">        Matcher matcher = pattern.matcher(content);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        while (matcher.find()) {</span>
+<span class="nc" id="L61">            matches.add(new MatchInfo(matcher.start(), matcher.end() - matcher.start()));</span>
+        }
+<span class="nc" id="L63">        return matches;</span>
+    }
+
+    @Override
+    protected void writeString(String text, List&lt;TextPosition&gt; textPositions) {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        for (MatchInfo match : findOccurrencesInText(searchText, text.toLowerCase())) {</span>
+<span class="nc" id="L69">            int index = match.startIndex;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (index + match.matchLength &lt;= textPositions.size()) {</span>
+                // Initial values based on the first character
+<span class="nc" id="L72">                TextPosition first = textPositions.get(index);</span>
+<span class="nc" id="L73">                float minX = first.getX();</span>
+<span class="nc" id="L74">                float minY = first.getY();</span>
+<span class="nc" id="L75">                float maxX = first.getX() + first.getWidth();</span>
+<span class="nc" id="L76">                float maxY = first.getY() + first.getHeight();</span>
+
+                // Loop over the rest of the characters and adjust bounding box values
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                for (int i = index; i &lt; index + match.matchLength; i++) {</span>
+<span class="nc" id="L80">                    TextPosition position = textPositions.get(i);</span>
+<span class="nc" id="L81">                    minX = Math.min(minX, position.getX());</span>
+<span class="nc" id="L82">                    minY = Math.min(minY, position.getY());</span>
+<span class="nc" id="L83">                    maxX = Math.max(maxX, position.getX() + position.getWidth());</span>
+<span class="nc" id="L84">                    maxY = Math.max(maxY, position.getY() + position.getHeight());</span>
+                }
+
+<span class="nc" id="L87">                textOccurrences.add(</span>
+<span class="nc" id="L88">                        new PDFText(getCurrentPageNo() - 1, minX, minY, maxX, maxY, text));</span>
+            }
+<span class="nc" id="L90">        }</span>
+<span class="nc" id="L91">    }</span>
+
+    public List&lt;PDFText&gt; getTextLocations(PDDocument document) throws Exception {
+<span class="nc" id="L94">        this.getText(document);</span>
+<span class="nc" id="L95">        System.out.println(</span>
+                &quot;Found &quot;
+<span class="nc" id="L97">                        + textOccurrences.size()</span>
+                        + &quot; occurrences of '&quot;
+                        + searchText
+                        + &quot;' in the document.&quot;);
+
+<span class="nc" id="L102">        return textOccurrences;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

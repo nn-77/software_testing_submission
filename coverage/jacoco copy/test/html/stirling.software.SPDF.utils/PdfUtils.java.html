@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.utils</a> &gt; <span class="el_source">PdfUtils.java</span></div><h1>PdfUtils.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.utils;
+
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
+import java.awt.image.RenderedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.PDPageContentStream.AppendMode;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.JPEGFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.rendering.ImageType;
+import org.apache.pdfbox.rendering.PDFRenderer;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.github.pixee.security.Filenames;
+
+<span class="nc" id="L42">public class PdfUtils {</span>
+
+<span class="fc" id="L44">    private static final Logger logger = LoggerFactory.getLogger(PdfUtils.class);</span>
+
+    public static PDRectangle textToPageSize(String size) {
+<span class="fc bfc" id="L47" title="All 10 branches covered.">        switch (size.toUpperCase()) {</span>
+            case &quot;A0&quot;:
+<span class="fc" id="L49">                return PDRectangle.A0;</span>
+            case &quot;A1&quot;:
+<span class="fc" id="L51">                return PDRectangle.A1;</span>
+            case &quot;A2&quot;:
+<span class="fc" id="L53">                return PDRectangle.A2;</span>
+            case &quot;A3&quot;:
+<span class="fc" id="L55">                return PDRectangle.A3;</span>
+            case &quot;A4&quot;:
+<span class="fc" id="L57">                return PDRectangle.A4;</span>
+            case &quot;A5&quot;:
+<span class="fc" id="L59">                return PDRectangle.A5;</span>
+            case &quot;A6&quot;:
+<span class="fc" id="L61">                return PDRectangle.A6;</span>
+            case &quot;LETTER&quot;:
+<span class="fc" id="L63">                return PDRectangle.LETTER;</span>
+            case &quot;LEGAL&quot;:
+<span class="fc" id="L65">                return PDRectangle.LEGAL;</span>
+            default:
+<span class="fc" id="L67">                throw new IllegalArgumentException(&quot;Invalid standard page size: &quot; + size);</span>
+        }
+    }
+
+    public static List&lt;RenderedImage&gt; getAllImages(PDResources resources) throws IOException {
+<span class="fc" id="L72">        List&lt;RenderedImage&gt; images = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (COSName name : resources.getXObjectNames()) {</span>
+<span class="fc" id="L75">            PDXObject object = resources.getXObject(name);</span>
+
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (object instanceof PDImageXObject) {</span>
+<span class="fc" id="L78">                images.add(((PDImageXObject) object).getImage());</span>
+
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            } else if (object instanceof PDFormXObject) {</span>
+<span class="fc" id="L81">                images.addAll(getAllImages(((PDFormXObject) object).getResources()));</span>
+            }
+<span class="fc" id="L83">        }</span>
+
+<span class="fc" id="L85">        return images;</span>
+    }
+
+    public static boolean hasImages(PDDocument document, String pagesToCheck) throws IOException {
+<span class="fc" id="L89">        String[] pageOrderArr = pagesToCheck.split(&quot;,&quot;);</span>
+<span class="fc" id="L90">        List&lt;Integer&gt; pageList =</span>
+<span class="fc" id="L91">                GeneralUtils.parsePageList(pageOrderArr, document.getNumberOfPages());</span>
+
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (int pageNumber : pageList) {</span>
+<span class="fc" id="L94">            PDPage page = document.getPage(pageNumber);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (hasImagesOnPage(page)) {</span>
+<span class="fc" id="L96">                return true;</span>
+            }
+<span class="fc" id="L98">        }</span>
+
+<span class="fc" id="L100">        return false;</span>
+    }
+
+    public static boolean hasText(PDDocument document, String pageNumbersToCheck, String phrase)
+            throws IOException {
+<span class="fc" id="L105">        String[] pageOrderArr = pageNumbersToCheck.split(&quot;,&quot;);</span>
+<span class="fc" id="L106">        List&lt;Integer&gt; pageList =</span>
+<span class="fc" id="L107">                GeneralUtils.parsePageList(pageOrderArr, document.getNumberOfPages());</span>
+
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (int pageNumber : pageList) {</span>
+<span class="fc" id="L110">            PDPage page = document.getPage(pageNumber);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (hasTextOnPage(page, phrase)) {</span>
+<span class="fc" id="L112">                return true;</span>
+            }
+<span class="fc" id="L114">        }</span>
+
+<span class="fc" id="L116">        return false;</span>
+    }
+
+    public static boolean hasImagesOnPage(PDPage page) throws IOException {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        return getAllImages(page.getResources()).size() &gt; 0;</span>
+    }
+
+    public static boolean hasTextOnPage(PDPage page, String phrase) throws IOException {
+<span class="fc" id="L124">        PDFTextStripper textStripper = new PDFTextStripper();</span>
+<span class="fc" id="L125">        PDDocument tempDoc = new PDDocument();</span>
+<span class="fc" id="L126">        tempDoc.addPage(page);</span>
+<span class="fc" id="L127">        String pageText = textStripper.getText(tempDoc);</span>
+<span class="fc" id="L128">        tempDoc.close();</span>
+<span class="fc" id="L129">        return pageText.contains(phrase);</span>
+    }
+
+    public static boolean containsTextInFile(
+            PDDocument pdfDocument, String text, String pagesToCheck) throws IOException {
+<span class="fc" id="L134">        PDFTextStripper textStripper = new PDFTextStripper();</span>
+<span class="fc" id="L135">        String pdfText = &quot;&quot;;</span>
+
+<span class="fc bfc" id="L137" title="All 4 branches covered.">        if (pagesToCheck == null || &quot;all&quot;.equals(pagesToCheck)) {</span>
+<span class="fc" id="L138">            pdfText = textStripper.getText(pdfDocument);</span>
+        } else {
+            // remove whitespaces
+<span class="fc" id="L141">            pagesToCheck = pagesToCheck.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+
+<span class="fc" id="L143">            String[] splitPoints = pagesToCheck.split(&quot;,&quot;);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            for (String splitPoint : splitPoints) {</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                if (splitPoint.contains(&quot;-&quot;)) {</span>
+                    // Handle page ranges
+<span class="fc" id="L147">                    String[] range = splitPoint.split(&quot;-&quot;);</span>
+<span class="fc" id="L148">                    int startPage = Integer.parseInt(range[0]);</span>
+<span class="fc" id="L149">                    int endPage = Integer.parseInt(range[1]);</span>
+
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                    for (int i = startPage; i &lt;= endPage; i++) {</span>
+<span class="fc" id="L152">                        textStripper.setStartPage(i);</span>
+<span class="fc" id="L153">                        textStripper.setEndPage(i);</span>
+<span class="fc" id="L154">                        pdfText += textStripper.getText(pdfDocument);</span>
+                    }
+<span class="fc" id="L156">                } else {</span>
+                    // Handle individual page
+<span class="fc" id="L158">                    int page = Integer.parseInt(splitPoint);</span>
+<span class="fc" id="L159">                    textStripper.setStartPage(page);</span>
+<span class="fc" id="L160">                    textStripper.setEndPage(page);</span>
+<span class="fc" id="L161">                    pdfText += textStripper.getText(pdfDocument);</span>
+                }
+            }
+        }
+
+<span class="fc" id="L166">        pdfDocument.close();</span>
+
+<span class="fc" id="L168">        return pdfText.contains(text);</span>
+    }
+
+    public static boolean pageCount(PDDocument pdfDocument, int pageCount, String comparator)
+            throws IOException {
+<span class="fc" id="L173">        int actualPageCount = pdfDocument.getNumberOfPages();</span>
+<span class="fc" id="L174">        pdfDocument.close();</span>
+
+<span class="fc bfc" id="L176" title="All 4 branches covered.">        switch (comparator.toLowerCase()) {</span>
+            case &quot;greater&quot;:
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                return actualPageCount &gt; pageCount;</span>
+            case &quot;equal&quot;:
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                return actualPageCount == pageCount;</span>
+            case &quot;less&quot;:
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                return actualPageCount &lt; pageCount;</span>
+            default:
+<span class="fc" id="L184">                throw new IllegalArgumentException(</span>
+                        &quot;Invalid comparator. Only 'greater', 'equal', and 'less' are supported.&quot;);
+        }
+    }
+
+    public static boolean pageSize(PDDocument pdfDocument, String expectedPageSize)
+            throws IOException {
+<span class="fc" id="L191">        PDPage firstPage = pdfDocument.getPage(0);</span>
+<span class="fc" id="L192">        PDRectangle mediaBox = firstPage.getMediaBox();</span>
+
+<span class="fc" id="L194">        float actualPageWidth = mediaBox.getWidth();</span>
+<span class="fc" id="L195">        float actualPageHeight = mediaBox.getHeight();</span>
+
+<span class="fc" id="L197">        pdfDocument.close();</span>
+
+        // Assumes the expectedPageSize is in the format &quot;widthxheight&quot;, e.g. &quot;595x842&quot; for A4
+<span class="fc" id="L200">        String[] dimensions = expectedPageSize.split(&quot;x&quot;);</span>
+<span class="fc" id="L201">        float expectedPageWidth = Float.parseFloat(dimensions[0]);</span>
+<span class="fc" id="L202">        float expectedPageHeight = Float.parseFloat(dimensions[1]);</span>
+
+        // Checks if the actual page size matches the expected page size
+<span class="fc bfc" id="L205" title="All 4 branches covered.">        return actualPageWidth == expectedPageWidth &amp;&amp; actualPageHeight == expectedPageHeight;</span>
+    }
+
+    public static byte[] convertFromPdf(
+            byte[] inputStream,
+            String imageType,
+            ImageType colorType,
+            boolean singleImage,
+            int DPI,
+            String filename)
+            throws IOException, Exception {
+<span class="fc" id="L216">        try (PDDocument document = Loader.loadPDF(inputStream)) {</span>
+<span class="fc" id="L217">            PDFRenderer pdfRenderer = new PDFRenderer(document);</span>
+<span class="fc" id="L218">            pdfRenderer.setSubsamplingAllowed(true);</span>
+<span class="fc" id="L219">            int pageCount = document.getNumberOfPages();</span>
+
+            // Create a ByteArrayOutputStream to save the image(s) to
+<span class="fc" id="L222">            ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            if (singleImage) {</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">                if (&quot;tiff&quot;.equals(imageType.toLowerCase())</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                        || &quot;tif&quot;.equals(imageType.toLowerCase())) {</span>
+                    // Write the images to the output stream as a TIFF with multiple frames
+<span class="fc" id="L228">                    ImageWriter writer = ImageIO.getImageWritersByFormatName(&quot;tiff&quot;).next();</span>
+<span class="fc" id="L229">                    ImageWriteParam param = writer.getDefaultWriteParam();</span>
+<span class="fc" id="L230">                    param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);</span>
+<span class="fc" id="L231">                    param.setCompressionType(&quot;ZLib&quot;);</span>
+<span class="fc" id="L232">                    param.setCompressionQuality(1.0f);</span>
+
+<span class="fc" id="L234">                    try (ImageOutputStream ios = ImageIO.createImageOutputStream(baos)) {</span>
+<span class="fc" id="L235">                        writer.setOutput(ios);</span>
+<span class="fc" id="L236">                        writer.prepareWriteSequence(null);</span>
+
+<span class="fc bfc" id="L238" title="All 2 branches covered.">                        for (int i = 0; i &lt; pageCount; ++i) {</span>
+<span class="fc" id="L239">                            BufferedImage image = pdfRenderer.renderImageWithDPI(i, DPI, colorType);</span>
+<span class="fc" id="L240">                            writer.writeToSequence(new IIOImage(image, null, null), param);</span>
+                        }
+
+<span class="fc" id="L243">                        writer.endWriteSequence();</span>
+                    }
+
+<span class="fc" id="L246">                    writer.dispose();</span>
+<span class="fc" id="L247">                } else {</span>
+                    // Combine all images into a single big image
+<span class="fc" id="L249">                    BufferedImage image = pdfRenderer.renderImageWithDPI(0, DPI, colorType);</span>
+<span class="fc" id="L250">                    BufferedImage combined =</span>
+                            new BufferedImage(
+<span class="fc" id="L252">                                    image.getWidth(),</span>
+<span class="fc" id="L253">                                    image.getHeight() * pageCount,</span>
+                                    BufferedImage.TYPE_INT_RGB);
+<span class="fc" id="L255">                    Graphics g = combined.getGraphics();</span>
+
+<span class="fc bfc" id="L257" title="All 2 branches covered.">                    for (int i = 0; i &lt; pageCount; ++i) {</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                        if (i != 0) {</span>
+<span class="fc" id="L259">                            image = pdfRenderer.renderImageWithDPI(i, DPI, colorType);</span>
+                        }
+<span class="fc" id="L261">                        g.drawImage(image, 0, i * image.getHeight(), null);</span>
+                    }
+
+                    // Write the image to the output stream
+<span class="fc" id="L265">                    ImageIO.write(combined, imageType, baos);</span>
+                }
+
+                // Log that the image was successfully written to the byte array
+<span class="fc" id="L269">                logger.info(&quot;Image successfully written to byte array&quot;);</span>
+            } else {
+                // Zip the images and return as byte array
+<span class="fc" id="L272">                try (ZipOutputStream zos = new ZipOutputStream(baos)) {</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                    for (int i = 0; i &lt; pageCount; ++i) {</span>
+<span class="fc" id="L274">                        BufferedImage image = pdfRenderer.renderImageWithDPI(i, DPI, colorType);</span>
+<span class="fc" id="L275">                        try (ByteArrayOutputStream baosImage = new ByteArrayOutputStream()) {</span>
+<span class="fc" id="L276">                            ImageIO.write(image, imageType, baosImage);</span>
+
+                            // Add the image to the zip file
+<span class="fc" id="L279">                            zos.putNextEntry(</span>
+                                    new ZipEntry(
+<span class="fc" id="L281">                                            String.format(</span>
+                                                    filename + &quot;_%d.%s&quot;,
+<span class="fc" id="L283">                                                    i + 1,</span>
+<span class="fc" id="L284">                                                    imageType.toLowerCase())));</span>
+<span class="fc" id="L285">                            zos.write(baosImage.toByteArray());</span>
+                        }
+                    }
+                    // Log that the images were successfully written to the byte array
+<span class="fc" id="L289">                    logger.info(&quot;Images successfully written to byte array as a zip&quot;);</span>
+                }
+            }
+<span class="fc" id="L292">            return baos.toByteArray();</span>
+<span class="fc" id="L293">        } catch (IOException e) {</span>
+            // Log an error message if there is an issue converting the PDF to an image
+<span class="fc" id="L295">            logger.error(&quot;Error converting PDF to image&quot;, e);</span>
+<span class="fc" id="L296">            throw e;</span>
+        }
+    }
+
+    public static byte[] imageToPdf(
+            MultipartFile[] files, String fitOption, boolean autoRotate, String colorType)
+            throws IOException {
+<span class="fc" id="L303">        try (PDDocument doc = new PDDocument()) {</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            for (MultipartFile file : files) {</span>
+<span class="fc" id="L305">                String contentType = file.getContentType();</span>
+<span class="fc" id="L306">                String originalFilename = Filenames.toSimpleFileName(file.getOriginalFilename());</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">                if (originalFilename != null</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">                        &amp;&amp; (originalFilename.toLowerCase().endsWith(&quot;.tiff&quot;)</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">                                || originalFilename.toLowerCase().endsWith(&quot;.tif&quot;))) {</span>
+<span class="fc" id="L310">                    ImageReader reader = ImageIO.getImageReadersByFormatName(&quot;tiff&quot;).next();</span>
+<span class="fc" id="L311">                    reader.setInput(ImageIO.createImageInputStream(file.getInputStream()));</span>
+<span class="fc" id="L312">                    int numPages = reader.getNumImages(true);</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">                    for (int i = 0; i &lt; numPages; i++) {</span>
+<span class="fc" id="L314">                        BufferedImage pageImage = reader.read(i);</span>
+<span class="fc" id="L315">                        BufferedImage convertedImage =</span>
+<span class="fc" id="L316">                                ImageProcessingUtils.convertColorType(pageImage, colorType);</span>
+<span class="fc" id="L317">                        PDImageXObject pdImage =</span>
+<span class="fc" id="L318">                                LosslessFactory.createFromImage(doc, convertedImage);</span>
+<span class="fc" id="L319">                        addImageToDocument(doc, pdImage, fitOption, autoRotate);</span>
+                    }
+<span class="fc" id="L321">                } else {</span>
+<span class="fc" id="L322">                    BufferedImage image = ImageIO.read(file.getInputStream());</span>
+<span class="fc" id="L323">                    BufferedImage convertedImage =</span>
+<span class="fc" id="L324">                            ImageProcessingUtils.convertColorType(image, colorType);</span>
+                    // Use JPEGFactory if it's JPEG since JPEG is lossy
+                    PDImageXObject pdImage =
+<span class="fc bfc" id="L327" title="All 4 branches covered.">                            (contentType != null &amp;&amp; &quot;image/jpeg&quot;.equals(contentType))</span>
+<span class="fc" id="L328">                                    ? JPEGFactory.createFromImage(doc, convertedImage)</span>
+<span class="fc" id="L329">                                    : LosslessFactory.createFromImage(doc, convertedImage);</span>
+<span class="fc" id="L330">                    addImageToDocument(doc, pdImage, fitOption, autoRotate);</span>
+                }
+            }
+<span class="fc" id="L333">            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();</span>
+<span class="fc" id="L334">            doc.save(byteArrayOutputStream);</span>
+<span class="fc" id="L335">            logger.info(&quot;PDF successfully saved to byte array&quot;);</span>
+<span class="fc" id="L336">            return byteArrayOutputStream.toByteArray();</span>
+        }
+    }
+
+    private static void addImageToDocument(
+            PDDocument doc, PDImageXObject image, String fitOption, boolean autoRotate)
+            throws IOException {
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        boolean imageIsLandscape = image.getWidth() &gt; image.getHeight();</span>
+<span class="fc" id="L344">        PDRectangle pageSize = PDRectangle.A4;</span>
+
+<span class="fc" id="L346">        System.out.println(fitOption);</span>
+
+<span class="fc bfc" id="L348" title="All 4 branches covered.">        if (autoRotate &amp;&amp; imageIsLandscape) {</span>
+<span class="fc" id="L349">            pageSize = new PDRectangle(pageSize.getHeight(), pageSize.getWidth());</span>
+        }
+
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        if (&quot;fitDocumentToImage&quot;.equals(fitOption)) {</span>
+<span class="fc" id="L353">            pageSize = new PDRectangle(image.getWidth(), image.getHeight());</span>
+        }
+
+<span class="fc" id="L356">        PDPage page = new PDPage(pageSize);</span>
+<span class="fc" id="L357">        doc.addPage(page);</span>
+
+<span class="fc" id="L359">        float pageWidth = page.getMediaBox().getWidth();</span>
+<span class="fc" id="L360">        float pageHeight = page.getMediaBox().getHeight();</span>
+
+<span class="fc" id="L362">        try (PDPageContentStream contentStream =</span>
+                new PDPageContentStream(doc, page, AppendMode.APPEND, true, true)) {
+<span class="fc bfc" id="L364" title="All 4 branches covered.">            if (&quot;fillPage&quot;.equals(fitOption) || &quot;fitDocumentToImage&quot;.equals(fitOption)) {</span>
+<span class="fc" id="L365">                contentStream.drawImage(image, 0, 0, pageWidth, pageHeight);</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">            } else if (&quot;maintainAspectRatio&quot;.equals(fitOption)) {</span>
+<span class="fc" id="L367">                float imageAspectRatio = (float) image.getWidth() / (float) image.getHeight();</span>
+<span class="fc" id="L368">                float pageAspectRatio = pageWidth / pageHeight;</span>
+
+<span class="fc" id="L370">                float scaleFactor = 1.0f;</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">                if (imageAspectRatio &gt; pageAspectRatio) {</span>
+<span class="fc" id="L372">                    scaleFactor = pageWidth / image.getWidth();</span>
+                } else {
+<span class="fc" id="L374">                    scaleFactor = pageHeight / image.getHeight();</span>
+                }
+
+<span class="fc" id="L377">                float xPos = (pageWidth - (image.getWidth() * scaleFactor)) / 2;</span>
+<span class="fc" id="L378">                float yPos = (pageHeight - (image.getHeight() * scaleFactor)) / 2;</span>
+<span class="fc" id="L379">                contentStream.drawImage(</span>
+                        image,
+                        xPos,
+                        yPos,
+<span class="fc" id="L383">                        image.getWidth() * scaleFactor,</span>
+<span class="fc" id="L384">                        image.getHeight() * scaleFactor);</span>
+            }
+<span class="nc" id="L386">        } catch (IOException e) {</span>
+<span class="nc" id="L387">            logger.error(&quot;Error adding image to PDF&quot;, e);</span>
+<span class="nc" id="L388">            throw e;</span>
+<span class="fc" id="L389">        }</span>
+<span class="fc" id="L390">    }</span>
+
+    public static byte[] overlayImage(
+            byte[] pdfBytes, byte[] imageBytes, float x, float y, boolean everyPage)
+            throws IOException {
+
+<span class="fc" id="L396">        PDDocument document = Loader.loadPDF(pdfBytes);</span>
+
+        // Get the first page of the PDF
+<span class="fc" id="L399">        int pages = document.getNumberOfPages();</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        for (int i = 0; i &lt; pages; i++) {</span>
+<span class="fc" id="L401">            PDPage page = document.getPage(i);</span>
+<span class="fc" id="L402">            try (PDPageContentStream contentStream =</span>
+                    new PDPageContentStream(
+                            document, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
+                // Create an image object from the image bytes
+<span class="fc" id="L406">                PDImageXObject image = PDImageXObject.createFromByteArray(document, imageBytes, &quot;&quot;);</span>
+                // Draw the image onto the page at the specified x and y coordinates
+<span class="fc" id="L408">                contentStream.drawImage(image, x, y);</span>
+<span class="fc" id="L409">                logger.info(&quot;Image successfully overlayed onto PDF&quot;);</span>
+<span class="pc bpc" id="L410" title="1 of 4 branches missed.">                if (!everyPage &amp;&amp; i == 0) {</span>
+<span class="fc" id="L411">                    break;</span>
+                }
+<span class="pc" id="L413">            } catch (IOException e) {</span>
+                // Log an error message if there is an issue overlaying the image onto the PDF
+<span class="nc" id="L415">                logger.error(&quot;Error overlaying image onto PDF&quot;, e);</span>
+<span class="nc" id="L416">                throw e;</span>
+<span class="fc" id="L417">            }</span>
+        }
+        // Create a ByteArrayOutputStream to save the PDF to
+<span class="fc" id="L420">        ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="fc" id="L421">        document.save(baos);</span>
+<span class="fc" id="L422">        logger.info(&quot;PDF successfully saved to byte array&quot;);</span>
+<span class="fc" id="L423">        return baos.toByteArray();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

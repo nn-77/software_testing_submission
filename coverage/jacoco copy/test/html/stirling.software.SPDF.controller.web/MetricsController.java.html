@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MetricsController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.web</a> &gt; <span class="el_source">MetricsController.java</span></div><h1>MetricsController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.web;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import jakarta.annotation.PostConstruct;
+import stirling.software.SPDF.config.StartupApplicationListener;
+import stirling.software.SPDF.model.ApplicationProperties;
+
+@RestController
+@RequestMapping(&quot;/api/v1/info&quot;)
+@Tag(name = &quot;Info&quot;, description = &quot;Info APIs&quot;)
+public class MetricsController {
+
+    @Autowired ApplicationProperties applicationProperties;
+
+    private final MeterRegistry meterRegistry;
+
+    private boolean metricsEnabled;
+
+    @PostConstruct
+    public void init() {
+<span class="nc" id="L44">        Boolean metricsEnabled = applicationProperties.getMetrics().getEnabled();</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (metricsEnabled == null) metricsEnabled = true;</span>
+<span class="nc" id="L46">        this.metricsEnabled = metricsEnabled;</span>
+<span class="nc" id="L47">    }</span>
+
+<span class="nc" id="L49">    public MetricsController(MeterRegistry meterRegistry) {</span>
+<span class="nc" id="L50">        this.meterRegistry = meterRegistry;</span>
+<span class="nc" id="L51">    }</span>
+
+    @GetMapping(&quot;/status&quot;)
+    @Operation(
+            summary = &quot;Application status and version&quot;,
+            description =
+                    &quot;This endpoint returns the status of the application and its version number.&quot;)
+    public ResponseEntity&lt;?&gt; getStatus() {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        if (!metricsEnabled) {</span>
+<span class="nc" id="L60">            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(&quot;This endpoint is disabled.&quot;);</span>
+        }
+
+<span class="nc" id="L63">        Map&lt;String, String&gt; status = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L64">        status.put(&quot;status&quot;, &quot;UP&quot;);</span>
+<span class="nc" id="L65">        status.put(&quot;version&quot;, getClass().getPackage().getImplementationVersion());</span>
+<span class="nc" id="L66">        return ResponseEntity.ok(status);</span>
+    }
+
+    @GetMapping(&quot;/loads&quot;)
+    @Operation(
+            summary = &quot;GET request count&quot;,
+            description =
+                    &quot;This endpoint returns the total count of GET requests or the count of GET requests for a specific endpoint.&quot;)
+    public ResponseEntity&lt;?&gt; getPageLoads(
+            @RequestParam(required = false, name = &quot;endpoint&quot;) @Parameter(description = &quot;endpoint&quot;)
+                    Optional&lt;String&gt; endpoint) {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (!metricsEnabled) {</span>
+<span class="nc" id="L78">            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(&quot;This endpoint is disabled.&quot;);</span>
+        }
+        try {
+
+<span class="nc" id="L82">            double count = 0.0;</span>
+
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            for (Meter meter : meterRegistry.getMeters()) {</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                if (meter.getId().getName().equals(&quot;http.requests&quot;)) {</span>
+<span class="nc" id="L86">                    String method = meter.getId().getTag(&quot;method&quot;);</span>
+<span class="nc bnc" id="L87" title="All 4 branches missed.">                    if (method != null &amp;&amp; &quot;GET&quot;.equals(method)) {</span>
+
+<span class="nc bnc" id="L89" title="All 4 branches missed.">                        if (endpoint.isPresent() &amp;&amp; !endpoint.get().isBlank()) {</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                            if (!endpoint.get().startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L91">                                endpoint = Optional.of(&quot;/&quot; + endpoint.get());</span>
+                            }
+<span class="nc" id="L93">                            System.out.println(</span>
+                                    &quot;loads &quot;
+<span class="nc" id="L95">                                            + endpoint.get()</span>
+                                            + &quot; vs &quot;
+<span class="nc" id="L97">                                            + meter.getId().getTag(&quot;uri&quot;));</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                            if (endpoint.get().equals(meter.getId().getTag(&quot;uri&quot;))) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                                if (meter instanceof Counter) {</span>
+<span class="nc" id="L100">                                    count += ((Counter) meter).count();</span>
+                                }
+                            }
+                        } else {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">                            if (meter instanceof Counter) {</span>
+<span class="nc" id="L105">                                count += ((Counter) meter).count();</span>
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L110">            }</span>
+
+<span class="nc" id="L112">            return ResponseEntity.ok(count);</span>
+<span class="nc" id="L113">        } catch (Exception e) {</span>
+<span class="nc" id="L114">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();</span>
+        }
+    }
+
+    @GetMapping(&quot;/loads/all&quot;)
+    @Operation(
+            summary = &quot;GET requests count for all endpoints&quot;,
+            description = &quot;This endpoint returns the count of GET requests for each endpoint.&quot;)
+    public ResponseEntity&lt;?&gt; getAllEndpointLoads() {
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (!metricsEnabled) {</span>
+<span class="nc" id="L124">            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(&quot;This endpoint is disabled.&quot;);</span>
+        }
+        try {
+<span class="nc" id="L127">            Map&lt;String, Double&gt; counts = new HashMap&lt;&gt;();</span>
+
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            for (Meter meter : meterRegistry.getMeters()) {</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                if (meter.getId().getName().equals(&quot;http.requests&quot;)) {</span>
+<span class="nc" id="L131">                    String method = meter.getId().getTag(&quot;method&quot;);</span>
+<span class="nc bnc" id="L132" title="All 4 branches missed.">                    if (method != null &amp;&amp; &quot;GET&quot;.equals(method)) {</span>
+<span class="nc" id="L133">                        String uri = meter.getId().getTag(&quot;uri&quot;);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                        if (uri != null) {</span>
+<span class="nc" id="L135">                            double currentCount = counts.getOrDefault(uri, 0.0);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">                            if (meter instanceof Counter) {</span>
+<span class="nc" id="L137">                                currentCount += ((Counter) meter).count();</span>
+                            }
+<span class="nc" id="L139">                            counts.put(uri, currentCount);</span>
+                        }
+                    }
+                }
+<span class="nc" id="L143">            }</span>
+
+<span class="nc" id="L145">            List&lt;EndpointCount&gt; results =</span>
+<span class="nc" id="L146">                    counts.entrySet().stream()</span>
+<span class="nc" id="L147">                            .map(entry -&gt; new EndpointCount(entry.getKey(), entry.getValue()))</span>
+<span class="nc" id="L148">                            .sorted(Comparator.comparing(EndpointCount::getCount).reversed())</span>
+<span class="nc" id="L149">                            .collect(Collectors.toList());</span>
+
+<span class="nc" id="L151">            return ResponseEntity.ok(results);</span>
+<span class="nc" id="L152">        } catch (Exception e) {</span>
+<span class="nc" id="L153">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();</span>
+        }
+    }
+
+    public class EndpointCount {
+        private String endpoint;
+        private double count;
+
+<span class="nc" id="L161">        public EndpointCount(String endpoint, double count) {</span>
+<span class="nc" id="L162">            this.endpoint = endpoint;</span>
+<span class="nc" id="L163">            this.count = count;</span>
+<span class="nc" id="L164">        }</span>
+
+        public String getEndpoint() {
+<span class="nc" id="L167">            return endpoint;</span>
+        }
+
+        public void setEndpoint(String endpoint) {
+<span class="nc" id="L171">            this.endpoint = endpoint;</span>
+<span class="nc" id="L172">        }</span>
+
+        public double getCount() {
+<span class="nc" id="L175">            return count;</span>
+        }
+
+        public void setCount(double count) {
+<span class="nc" id="L179">            this.count = count;</span>
+<span class="nc" id="L180">        }</span>
+    }
+
+    @GetMapping(&quot;/requests&quot;)
+    @Operation(
+            summary = &quot;POST request count&quot;,
+            description =
+                    &quot;This endpoint returns the total count of POST requests or the count of POST requests for a specific endpoint.&quot;)
+    public ResponseEntity&lt;?&gt; getTotalRequests(
+            @RequestParam(required = false, name = &quot;endpoint&quot;) @Parameter(description = &quot;endpoint&quot;)
+                    Optional&lt;String&gt; endpoint) {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (!metricsEnabled) {</span>
+<span class="nc" id="L192">            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(&quot;This endpoint is disabled.&quot;);</span>
+        }
+        try {
+<span class="nc" id="L195">            double count = 0.0;</span>
+
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            for (Meter meter : meterRegistry.getMeters()) {</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">                if (meter.getId().getName().equals(&quot;http.requests&quot;)) {</span>
+<span class="nc" id="L199">                    String method = meter.getId().getTag(&quot;method&quot;);</span>
+<span class="nc bnc" id="L200" title="All 4 branches missed.">                    if (method != null &amp;&amp; &quot;POST&quot;.equals(method)) {</span>
+<span class="nc bnc" id="L201" title="All 4 branches missed.">                        if (endpoint.isPresent() &amp;&amp; !endpoint.get().isBlank()) {</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                            if (!endpoint.get().startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L203">                                endpoint = Optional.of(&quot;/&quot; + endpoint.get());</span>
+                            }
+<span class="nc bnc" id="L205" title="All 2 branches missed.">                            if (endpoint.get().equals(meter.getId().getTag(&quot;uri&quot;))) {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                                if (meter instanceof Counter) {</span>
+<span class="nc" id="L207">                                    count += ((Counter) meter).count();</span>
+                                }
+                            }
+                        } else {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                            if (meter instanceof Counter) {</span>
+<span class="nc" id="L212">                                count += ((Counter) meter).count();</span>
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L217">            }</span>
+<span class="nc" id="L218">            return ResponseEntity.ok(count);</span>
+<span class="nc" id="L219">        } catch (Exception e) {</span>
+<span class="nc" id="L220">            return ResponseEntity.ok(-1);</span>
+        }
+    }
+
+    @GetMapping(&quot;/requests/all&quot;)
+    @Operation(
+            summary = &quot;POST requests count for all endpoints&quot;,
+            description = &quot;This endpoint returns the count of POST requests for each endpoint.&quot;)
+    public ResponseEntity&lt;?&gt; getAllPostRequests() {
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (!metricsEnabled) {</span>
+<span class="nc" id="L230">            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(&quot;This endpoint is disabled.&quot;);</span>
+        }
+        try {
+<span class="nc" id="L233">            Map&lt;String, Double&gt; counts = new HashMap&lt;&gt;();</span>
+
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            for (Meter meter : meterRegistry.getMeters()) {</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">                if (meter.getId().getName().equals(&quot;http.requests&quot;)) {</span>
+<span class="nc" id="L237">                    String method = meter.getId().getTag(&quot;method&quot;);</span>
+<span class="nc bnc" id="L238" title="All 4 branches missed.">                    if (method != null &amp;&amp; &quot;POST&quot;.equals(method)) {</span>
+<span class="nc" id="L239">                        String uri = meter.getId().getTag(&quot;uri&quot;);</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">                        if (uri != null) {</span>
+<span class="nc" id="L241">                            double currentCount = counts.getOrDefault(uri, 0.0);</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">                            if (meter instanceof Counter) {</span>
+<span class="nc" id="L243">                                currentCount += ((Counter) meter).count();</span>
+                            }
+<span class="nc" id="L245">                            counts.put(uri, currentCount);</span>
+                        }
+                    }
+                }
+<span class="nc" id="L249">            }</span>
+
+<span class="nc" id="L251">            List&lt;EndpointCount&gt; results =</span>
+<span class="nc" id="L252">                    counts.entrySet().stream()</span>
+<span class="nc" id="L253">                            .map(entry -&gt; new EndpointCount(entry.getKey(), entry.getValue()))</span>
+<span class="nc" id="L254">                            .sorted(Comparator.comparing(EndpointCount::getCount).reversed())</span>
+<span class="nc" id="L255">                            .collect(Collectors.toList());</span>
+
+<span class="nc" id="L257">            return ResponseEntity.ok(results);</span>
+<span class="nc" id="L258">        } catch (Exception e) {</span>
+<span class="nc" id="L259">            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();</span>
+        }
+    }
+
+    @GetMapping(&quot;/uptime&quot;)
+    public ResponseEntity&lt;?&gt; getUptime() {
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (!metricsEnabled) {</span>
+<span class="nc" id="L266">            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(&quot;This endpoint is disabled.&quot;);</span>
+        }
+
+<span class="nc" id="L269">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="nc" id="L270">        Duration uptime = Duration.between(StartupApplicationListener.startTime, now);</span>
+<span class="nc" id="L271">        return ResponseEntity.ok(formatDuration(uptime));</span>
+    }
+
+    private String formatDuration(Duration duration) {
+<span class="nc" id="L275">        long days = duration.toDays();</span>
+<span class="nc" id="L276">        long hours = duration.toHoursPart();</span>
+<span class="nc" id="L277">        long minutes = duration.toMinutesPart();</span>
+<span class="nc" id="L278">        long seconds = duration.toSecondsPart();</span>
+<span class="nc" id="L279">        return String.format(&quot;%dd %dh %dm %ds&quot;, days, hours, minutes, seconds);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

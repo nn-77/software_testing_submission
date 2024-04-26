@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScalePagesController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api</a> &gt; <span class="el_source">ScalePagesController.java</span></div><h1>ScalePagesController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.multipdf.LayerUtility;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.apache.pdfbox.util.Matrix;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.github.pixee.security.Filenames;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.general.ScalePagesRequest;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/general&quot;)
+@Tag(name = &quot;General&quot;, description = &quot;General APIs&quot;)
+<span class="nc" id="L35">public class ScalePagesController {</span>
+
+<span class="nc" id="L37">    private static final Logger logger = LoggerFactory.getLogger(ScalePagesController.class);</span>
+
+    @PostMapping(value = &quot;/scale-pages&quot;, consumes = &quot;multipart/form-data&quot;)
+    @Operation(
+            summary = &quot;Change the size of a PDF page/document&quot;,
+            description =
+                    &quot;This operation takes an input PDF file and the size to scale the pages to in the output PDF file. Input:PDF Output:PDF Type:SISO&quot;)
+    public ResponseEntity&lt;byte[]&gt; scalePages(@ModelAttribute ScalePagesRequest request)
+            throws IOException {
+<span class="nc" id="L46">        MultipartFile file = request.getFileInput();</span>
+<span class="nc" id="L47">        String targetPDRectangle = request.getPageSize();</span>
+<span class="nc" id="L48">        float scaleFactor = request.getScaleFactor();</span>
+
+<span class="nc" id="L50">        Map&lt;String, PDRectangle&gt; sizeMap = new HashMap&lt;&gt;();</span>
+        // Add A0 - A10
+<span class="nc" id="L52">        sizeMap.put(&quot;A0&quot;, PDRectangle.A0);</span>
+<span class="nc" id="L53">        sizeMap.put(&quot;A1&quot;, PDRectangle.A1);</span>
+<span class="nc" id="L54">        sizeMap.put(&quot;A2&quot;, PDRectangle.A2);</span>
+<span class="nc" id="L55">        sizeMap.put(&quot;A3&quot;, PDRectangle.A3);</span>
+<span class="nc" id="L56">        sizeMap.put(&quot;A4&quot;, PDRectangle.A4);</span>
+<span class="nc" id="L57">        sizeMap.put(&quot;A5&quot;, PDRectangle.A5);</span>
+<span class="nc" id="L58">        sizeMap.put(&quot;A6&quot;, PDRectangle.A6);</span>
+
+        // Add other sizes
+<span class="nc" id="L61">        sizeMap.put(&quot;LETTER&quot;, PDRectangle.LETTER);</span>
+<span class="nc" id="L62">        sizeMap.put(&quot;LEGAL&quot;, PDRectangle.LEGAL);</span>
+
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (!sizeMap.containsKey(targetPDRectangle)) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(</span>
+                    &quot;Invalid PDRectangle. It must be one of the following: A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10&quot;);
+        }
+
+<span class="nc" id="L69">        PDRectangle targetSize = sizeMap.get(targetPDRectangle);</span>
+
+<span class="nc" id="L71">        PDDocument sourceDocument = Loader.loadPDF(file.getBytes());</span>
+<span class="nc" id="L72">        PDDocument outputDocument = new PDDocument();</span>
+
+<span class="nc" id="L74">        int totalPages = sourceDocument.getNumberOfPages();</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        for (int i = 0; i &lt; totalPages; i++) {</span>
+<span class="nc" id="L76">            PDPage sourcePage = sourceDocument.getPage(i);</span>
+<span class="nc" id="L77">            PDRectangle sourceSize = sourcePage.getMediaBox();</span>
+
+<span class="nc" id="L79">            float scaleWidth = targetSize.getWidth() / sourceSize.getWidth();</span>
+<span class="nc" id="L80">            float scaleHeight = targetSize.getHeight() / sourceSize.getHeight();</span>
+<span class="nc" id="L81">            float scale = Math.min(scaleWidth, scaleHeight) * scaleFactor;</span>
+
+<span class="nc" id="L83">            PDPage newPage = new PDPage(targetSize);</span>
+<span class="nc" id="L84">            outputDocument.addPage(newPage);</span>
+
+<span class="nc" id="L86">            PDPageContentStream contentStream =</span>
+                    new PDPageContentStream(
+                            outputDocument,
+                            newPage,
+                            PDPageContentStream.AppendMode.APPEND,
+                            true,
+                            true);
+
+<span class="nc" id="L94">            float x = (targetSize.getWidth() - sourceSize.getWidth() * scale) / 2;</span>
+<span class="nc" id="L95">            float y = (targetSize.getHeight() - sourceSize.getHeight() * scale) / 2;</span>
+
+<span class="nc" id="L97">            contentStream.saveGraphicsState();</span>
+<span class="nc" id="L98">            contentStream.transform(Matrix.getTranslateInstance(x, y));</span>
+<span class="nc" id="L99">            contentStream.transform(Matrix.getScaleInstance(scale, scale));</span>
+
+<span class="nc" id="L101">            LayerUtility layerUtility = new LayerUtility(outputDocument);</span>
+<span class="nc" id="L102">            PDFormXObject form = layerUtility.importPageAsForm(sourceDocument, i);</span>
+<span class="nc" id="L103">            contentStream.drawForm(form);</span>
+
+<span class="nc" id="L105">            contentStream.restoreGraphicsState();</span>
+<span class="nc" id="L106">            contentStream.close();</span>
+        }
+
+<span class="nc" id="L109">        ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L110">        outputDocument.save(baos);</span>
+<span class="nc" id="L111">        outputDocument.close();</span>
+<span class="nc" id="L112">        sourceDocument.close();</span>
+
+<span class="nc" id="L114">        return WebResponseUtils.bytesToWebResponse(</span>
+<span class="nc" id="L115">                baos.toByteArray(),</span>
+<span class="nc" id="L116">                Filenames.toSimpleFileName(file.getOriginalFilename()).replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                        + &quot;_scaled.pdf&quot;);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

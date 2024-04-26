@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InitialSecuritySetup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.config.security</a> &gt; <span class="el_source">InitialSecuritySetup.java</span></div><h1>InitialSecuritySetup.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.config.security;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import jakarta.annotation.PostConstruct;
+import stirling.software.SPDF.model.ApplicationProperties;
+import stirling.software.SPDF.model.Role;
+
+@Component
+<span class="nc" id="L18">public class InitialSecuritySetup {</span>
+
+    @Autowired private UserService userService;
+
+    @Autowired ApplicationProperties applicationProperties;
+
+    @PostConstruct
+    public void init() {
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        if (!userService.hasUsers()) {</span>
+
+<span class="nc" id="L28">            String initialUsername =</span>
+<span class="nc" id="L29">                    applicationProperties.getSecurity().getInitialLogin().getUsername();</span>
+<span class="nc" id="L30">            String initialPassword =</span>
+<span class="nc" id="L31">                    applicationProperties.getSecurity().getInitialLogin().getPassword();</span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">            if (initialUsername != null &amp;&amp; initialPassword != null) {</span>
+<span class="nc" id="L33">                userService.saveUser(initialUsername, initialPassword, Role.ADMIN.getRoleId());</span>
+            } else {
+<span class="nc" id="L35">                initialUsername = &quot;admin&quot;;</span>
+<span class="nc" id="L36">                initialPassword = &quot;stirling&quot;;</span>
+<span class="nc" id="L37">                userService.saveUser(</span>
+<span class="nc" id="L38">                        initialUsername, initialPassword, Role.ADMIN.getRoleId(), true);</span>
+            }
+        }
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (!userService.usernameExists(Role.INTERNAL_API_USER.getRoleId())) {</span>
+<span class="nc" id="L42">            userService.saveUser(</span>
+<span class="nc" id="L43">                    Role.INTERNAL_API_USER.getRoleId(),</span>
+<span class="nc" id="L44">                    UUID.randomUUID().toString(),</span>
+<span class="nc" id="L45">                    Role.INTERNAL_API_USER.getRoleId());</span>
+<span class="nc" id="L46">            userService.addApiKeyToUser(Role.INTERNAL_API_USER.getRoleId());</span>
+        }
+<span class="nc" id="L48">    }</span>
+
+    @PostConstruct
+    public void initSecretKey() throws IOException {
+<span class="nc" id="L52">        String secretKey = applicationProperties.getAutomaticallyGenerated().getKey();</span>
+<span class="nc bnc" id="L53" title="All 4 branches missed.">        if (secretKey == null || secretKey.isEmpty()) {</span>
+<span class="nc" id="L54">            secretKey = UUID.randomUUID().toString(); // Generating a random UUID as the secret key</span>
+<span class="nc" id="L55">            saveKeyToConfig(secretKey);</span>
+        }
+<span class="nc" id="L57">    }</span>
+
+    private void saveKeyToConfig(String key) throws IOException {
+<span class="nc" id="L60">        Path path = Paths.get(&quot;configs&quot;, &quot;settings.yml&quot;); // Target the configs/settings.yml</span>
+<span class="nc" id="L61">        List&lt;String&gt; lines = Files.readAllLines(path);</span>
+<span class="nc" id="L62">        boolean keyFound = false;</span>
+
+        // Search for the existing key to replace it or place to add it
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        for (int i = 0; i &lt; lines.size(); i++) {</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            if (lines.get(i).startsWith(&quot;AutomaticallyGenerated:&quot;)) {</span>
+<span class="nc" id="L67">                keyFound = true;</span>
+<span class="nc bnc" id="L68" title="All 4 branches missed.">                if (i + 1 &lt; lines.size() &amp;&amp; lines.get(i + 1).trim().startsWith(&quot;key:&quot;)) {</span>
+<span class="nc" id="L69">                    lines.set(i + 1, &quot;  key: &quot; + key);</span>
+<span class="nc" id="L70">                    break;</span>
+                } else {
+<span class="nc" id="L72">                    lines.add(i + 1, &quot;  key: &quot; + key);</span>
+<span class="nc" id="L73">                    break;</span>
+                }
+            }
+        }
+
+        // If the section doesn't exist, append it
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (!keyFound) {</span>
+<span class="nc" id="L80">            lines.add(&quot;# Automatically Generated Settings (Do Not Edit Directly)&quot;);</span>
+<span class="nc" id="L81">            lines.add(&quot;AutomaticallyGenerated:&quot;);</span>
+<span class="nc" id="L82">            lines.add(&quot;  key: &quot; + key);</span>
+        }
+
+        // Write back to the file
+<span class="nc" id="L86">        Files.write(path, lines);</span>
+<span class="nc" id="L87">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ToSinglePageController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api</a> &gt; <span class="el_source">ToSinglePageController.java</span></div><h1>ToSinglePageController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api;
+
+import java.awt.geom.AffineTransform;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.multipdf.LayerUtility;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.PDFFile;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/general&quot;)
+@Tag(name = &quot;General&quot;, description = &quot;General APIs&quot;)
+<span class="nc" id="L31">public class ToSinglePageController {</span>
+
+<span class="nc" id="L33">    private static final Logger logger = LoggerFactory.getLogger(ToSinglePageController.class);</span>
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/pdf-to-single-page&quot;)
+    @Operation(
+            summary = &quot;Convert a multi-page PDF into a single long page PDF&quot;,
+            description =
+                    &quot;This endpoint converts a multi-page PDF document into a single paged PDF document. The width of the single page will be same as the input's width, but the height will be the sum of all the pages' heights. Input:PDF Output:PDF Type:SISO&quot;)
+    public ResponseEntity&lt;byte[]&gt; pdfToSinglePage(@ModelAttribute PDFFile request)
+            throws IOException {
+
+        // Load the source document
+<span class="nc" id="L44">        PDDocument sourceDocument = Loader.loadPDF(request.getFileInput().getBytes());</span>
+
+        // Calculate total height and max width
+<span class="nc" id="L47">        float totalHeight = 0;</span>
+<span class="nc" id="L48">        float maxWidth = 0;</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        for (PDPage page : sourceDocument.getPages()) {</span>
+<span class="nc" id="L50">            PDRectangle pageSize = page.getMediaBox();</span>
+<span class="nc" id="L51">            totalHeight += pageSize.getHeight();</span>
+<span class="nc" id="L52">            maxWidth = Math.max(maxWidth, pageSize.getWidth());</span>
+<span class="nc" id="L53">        }</span>
+
+        // Create new document and page with calculated dimensions
+<span class="nc" id="L56">        PDDocument newDocument = new PDDocument();</span>
+<span class="nc" id="L57">        PDPage newPage = new PDPage(new PDRectangle(maxWidth, totalHeight));</span>
+<span class="nc" id="L58">        newDocument.addPage(newPage);</span>
+
+        // Initialize the content stream of the new page
+<span class="nc" id="L61">        PDPageContentStream contentStream = new PDPageContentStream(newDocument, newPage);</span>
+<span class="nc" id="L62">        contentStream.close();</span>
+
+<span class="nc" id="L64">        LayerUtility layerUtility = new LayerUtility(newDocument);</span>
+<span class="nc" id="L65">        float yOffset = totalHeight;</span>
+
+        // For each page, copy its content to the new page at the correct offset
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        for (PDPage page : sourceDocument.getPages()) {</span>
+<span class="nc" id="L69">            PDFormXObject form =</span>
+<span class="nc" id="L70">                    layerUtility.importPageAsForm(</span>
+<span class="nc" id="L71">                            sourceDocument, sourceDocument.getPages().indexOf(page));</span>
+<span class="nc" id="L72">            AffineTransform af =</span>
+<span class="nc" id="L73">                    AffineTransform.getTranslateInstance(</span>
+<span class="nc" id="L74">                            0, yOffset - page.getMediaBox().getHeight());</span>
+<span class="nc" id="L75">            layerUtility.wrapInSaveRestore(newPage);</span>
+<span class="nc" id="L76">            String defaultLayerName = &quot;Layer&quot; + sourceDocument.getPages().indexOf(page);</span>
+<span class="nc" id="L77">            layerUtility.appendFormAsLayer(newPage, form, af, defaultLayerName);</span>
+<span class="nc" id="L78">            yOffset -= page.getMediaBox().getHeight();</span>
+<span class="nc" id="L79">        }</span>
+
+<span class="nc" id="L81">        ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L82">        newDocument.save(baos);</span>
+<span class="nc" id="L83">        newDocument.close();</span>
+<span class="nc" id="L84">        sourceDocument.close();</span>
+
+<span class="nc" id="L86">        byte[] result = baos.toByteArray();</span>
+<span class="nc" id="L87">        return WebResponseUtils.bytesToWebResponse(</span>
+                result,
+<span class="nc" id="L89">                request.getFileInput().getOriginalFilename().replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                        + &quot;_singlePage.pdf&quot;);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

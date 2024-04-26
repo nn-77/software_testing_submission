@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OCRController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api.misc</a> &gt; <span class="el_source">OCRController.java</span></div><h1>OCRController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api.misc;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.github.pixee.security.Filenames;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.misc.ProcessPdfWithOcrRequest;
+import stirling.software.SPDF.utils.ProcessExecutor;
+import stirling.software.SPDF.utils.ProcessExecutor.ProcessExecutorResult;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/misc&quot;)
+@Tag(name = &quot;Misc&quot;, description = &quot;Miscellaneous APIs&quot;)
+<span class="nc" id="L39">public class OCRController {</span>
+
+<span class="nc" id="L41">    private static final Logger logger = LoggerFactory.getLogger(OCRController.class);</span>
+
+    public List&lt;String&gt; getAvailableTesseractLanguages() {
+<span class="nc" id="L44">        String tessdataDir = &quot;/usr/share/tessdata&quot;;</span>
+<span class="nc" id="L45">        File[] files = new File(tessdataDir).listFiles();</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (files == null) {</span>
+<span class="nc" id="L47">            return Collections.emptyList();</span>
+        }
+<span class="nc" id="L49">        return Arrays.stream(files)</span>
+<span class="nc" id="L50">                .filter(file -&gt; file.getName().endsWith(&quot;.traineddata&quot;))</span>
+<span class="nc" id="L51">                .map(file -&gt; file.getName().replace(&quot;.traineddata&quot;, &quot;&quot;))</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">                .filter(lang -&gt; !lang.equalsIgnoreCase(&quot;osd&quot;))</span>
+<span class="nc" id="L53">                .collect(Collectors.toList());</span>
+    }
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/ocr-pdf&quot;)
+    @Operation(
+            summary = &quot;Process a PDF file with OCR&quot;,
+            description =
+                    &quot;This endpoint processes a PDF file using OCR (Optical Character Recognition). Users can specify languages, sidecar, deskew, clean, cleanFinal, ocrType, ocrRenderType, and removeImagesAfter options. Input:PDF Output:PDF Type:SI-Conditional&quot;)
+    public ResponseEntity&lt;byte[]&gt; processPdfWithOCR(
+            @ModelAttribute ProcessPdfWithOcrRequest request)
+            throws IOException, InterruptedException {
+<span class="nc" id="L64">        MultipartFile inputFile = request.getFileInput();</span>
+<span class="nc" id="L65">        List&lt;String&gt; selectedLanguages = request.getLanguages();</span>
+<span class="nc" id="L66">        Boolean sidecar = request.isSidecar();</span>
+<span class="nc" id="L67">        Boolean deskew = request.isDeskew();</span>
+<span class="nc" id="L68">        Boolean clean = request.isClean();</span>
+<span class="nc" id="L69">        Boolean cleanFinal = request.isCleanFinal();</span>
+<span class="nc" id="L70">        String ocrType = request.getOcrType();</span>
+<span class="nc" id="L71">        String ocrRenderType = request.getOcrRenderType();</span>
+<span class="nc" id="L72">        Boolean removeImagesAfter = request.isRemoveImagesAfter();</span>
+        // --output-type pdfa
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        if (selectedLanguages == null || selectedLanguages.isEmpty()) {</span>
+<span class="nc" id="L75">            throw new IOException(&quot;Please select at least one language.&quot;);</span>
+        }
+
+<span class="nc bnc" id="L78" title="All 4 branches missed.">        if (!&quot;hocr&quot;.equals(ocrRenderType) &amp;&amp; !&quot;sandwich&quot;.equals(ocrRenderType)) {</span>
+<span class="nc" id="L79">            throw new IOException(&quot;ocrRenderType wrong&quot;);</span>
+        }
+
+        // Get available Tesseract languages
+<span class="nc" id="L83">        List&lt;String&gt; availableLanguages = getAvailableTesseractLanguages();</span>
+
+        // Validate selected languages
+<span class="nc" id="L86">        selectedLanguages =</span>
+<span class="nc" id="L87">                selectedLanguages.stream().filter(availableLanguages::contains).toList();</span>
+
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (selectedLanguages.isEmpty()) {</span>
+<span class="nc" id="L90">            throw new IOException(&quot;None of the selected languages are valid.&quot;);</span>
+        }
+        // Save the uploaded file to a temporary location
+<span class="nc" id="L93">        Path tempInputFile = Files.createTempFile(&quot;input_&quot;, &quot;.pdf&quot;);</span>
+<span class="nc" id="L94">        Files.copy(inputFile.getInputStream(), tempInputFile, StandardCopyOption.REPLACE_EXISTING);</span>
+
+        // Prepare the output file path
+<span class="nc" id="L97">        Path tempOutputFile = Files.createTempFile(&quot;output_&quot;, &quot;.pdf&quot;);</span>
+
+        // Prepare the output file path
+<span class="nc" id="L100">        Path sidecarTextPath = null;</span>
+
+        // Run OCR Command
+<span class="nc" id="L103">        String languageOption = String.join(&quot;+&quot;, selectedLanguages);</span>
+
+<span class="nc" id="L105">        List&lt;String&gt; command =</span>
+                new ArrayList&lt;&gt;(
+<span class="nc" id="L107">                        Arrays.asList(</span>
+                                &quot;ocrmypdf&quot;,
+                                &quot;--verbose&quot;,
+                                &quot;2&quot;,
+                                &quot;--output-type&quot;,
+                                &quot;pdf&quot;,
+                                &quot;--pdf-renderer&quot;,
+                                ocrRenderType));
+
+<span class="nc bnc" id="L116" title="All 4 branches missed.">        if (sidecar != null &amp;&amp; sidecar) {</span>
+<span class="nc" id="L117">            sidecarTextPath = Files.createTempFile(&quot;sidecar&quot;, &quot;.txt&quot;);</span>
+<span class="nc" id="L118">            command.add(&quot;--sidecar&quot;);</span>
+<span class="nc" id="L119">            command.add(sidecarTextPath.toString());</span>
+        }
+
+<span class="nc bnc" id="L122" title="All 4 branches missed.">        if (deskew != null &amp;&amp; deskew) {</span>
+<span class="nc" id="L123">            command.add(&quot;--deskew&quot;);</span>
+        }
+<span class="nc bnc" id="L125" title="All 4 branches missed.">        if (clean != null &amp;&amp; clean) {</span>
+<span class="nc" id="L126">            command.add(&quot;--clean&quot;);</span>
+        }
+<span class="nc bnc" id="L128" title="All 4 branches missed.">        if (cleanFinal != null &amp;&amp; cleanFinal) {</span>
+<span class="nc" id="L129">            command.add(&quot;--clean-final&quot;);</span>
+        }
+<span class="nc bnc" id="L131" title="All 4 branches missed.">        if (ocrType != null &amp;&amp; !&quot;&quot;.equals(ocrType)) {</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (&quot;skip-text&quot;.equals(ocrType)) {</span>
+<span class="nc" id="L133">                command.add(&quot;--skip-text&quot;);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">            } else if (&quot;force-ocr&quot;.equals(ocrType)) {</span>
+<span class="nc" id="L135">                command.add(&quot;--force-ocr&quot;);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            } else if (&quot;Normal&quot;.equals(ocrType)) {</span>
+
+            }
+        }
+
+<span class="nc" id="L141">        command.addAll(</span>
+<span class="nc" id="L142">                Arrays.asList(</span>
+                        &quot;--language&quot;,
+                        languageOption,
+<span class="nc" id="L145">                        tempInputFile.toString(),</span>
+<span class="nc" id="L146">                        tempOutputFile.toString()));</span>
+
+        // Run CLI command
+<span class="nc" id="L149">        ProcessExecutorResult result =</span>
+<span class="nc" id="L150">                ProcessExecutor.getInstance(ProcessExecutor.Processes.OCR_MY_PDF)</span>
+<span class="nc" id="L151">                        .runCommandWithOutputHandling(command);</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (result.getRc() != 0</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                &amp;&amp; result.getMessages().contains(&quot;multiprocessing/synchronize.py&quot;)</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                &amp;&amp; result.getMessages().contains(&quot;OSError: [Errno 38] Function not implemented&quot;)) {</span>
+<span class="nc" id="L155">            command.add(&quot;--jobs&quot;);</span>
+<span class="nc" id="L156">            command.add(&quot;1&quot;);</span>
+<span class="nc" id="L157">            result =</span>
+<span class="nc" id="L158">                    ProcessExecutor.getInstance(ProcessExecutor.Processes.OCR_MY_PDF)</span>
+<span class="nc" id="L159">                            .runCommandWithOutputHandling(command);</span>
+        }
+
+        // Remove images from the OCR processed PDF if the flag is set to true
+<span class="nc bnc" id="L163" title="All 4 branches missed.">        if (removeImagesAfter != null &amp;&amp; removeImagesAfter) {</span>
+<span class="nc" id="L164">            Path tempPdfWithoutImages = Files.createTempFile(&quot;output_&quot;, &quot;_no_images.pdf&quot;);</span>
+
+<span class="nc" id="L166">            List&lt;String&gt; gsCommand =</span>
+<span class="nc" id="L167">                    Arrays.asList(</span>
+                            &quot;gs&quot;,
+                            &quot;-sDEVICE=pdfwrite&quot;,
+                            &quot;-dFILTERIMAGE&quot;,
+                            &quot;-o&quot;,
+<span class="nc" id="L172">                            tempPdfWithoutImages.toString(),</span>
+<span class="nc" id="L173">                            tempOutputFile.toString());</span>
+
+<span class="nc" id="L175">            ProcessExecutor.getInstance(ProcessExecutor.Processes.GHOSTSCRIPT)</span>
+<span class="nc" id="L176">                    .runCommandWithOutputHandling(gsCommand);</span>
+<span class="nc" id="L177">            tempOutputFile = tempPdfWithoutImages;</span>
+        }
+        // Read the OCR processed PDF file
+<span class="nc" id="L180">        byte[] pdfBytes = Files.readAllBytes(tempOutputFile);</span>
+        // Clean up the temporary files
+<span class="nc" id="L182">        Files.delete(tempInputFile);</span>
+
+        // Return the OCR processed PDF as a response
+<span class="nc" id="L185">        String outputFilename =</span>
+<span class="nc" id="L186">                Filenames.toSimpleFileName(inputFile.getOriginalFilename())</span>
+<span class="nc" id="L187">                                .replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                        + &quot;_OCR.pdf&quot;;
+
+<span class="nc bnc" id="L190" title="All 4 branches missed.">        if (sidecar != null &amp;&amp; sidecar) {</span>
+            // Create a zip file containing both the PDF and the text file
+<span class="nc" id="L192">            String outputZipFilename =</span>
+<span class="nc" id="L193">                    Filenames.toSimpleFileName(inputFile.getOriginalFilename())</span>
+<span class="nc" id="L194">                                    .replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                            + &quot;_OCR.zip&quot;;
+<span class="nc" id="L196">            Path tempZipFile = Files.createTempFile(&quot;output_&quot;, &quot;.zip&quot;);</span>
+
+<span class="nc" id="L198">            try (ZipOutputStream zipOut =</span>
+<span class="nc" id="L199">                    new ZipOutputStream(new FileOutputStream(tempZipFile.toFile()))) {</span>
+                // Add PDF file to the zip
+<span class="nc" id="L201">                ZipEntry pdfEntry = new ZipEntry(outputFilename);</span>
+<span class="nc" id="L202">                zipOut.putNextEntry(pdfEntry);</span>
+<span class="nc" id="L203">                Files.copy(tempOutputFile, zipOut);</span>
+<span class="nc" id="L204">                zipOut.closeEntry();</span>
+
+                // Add text file to the zip
+<span class="nc" id="L207">                ZipEntry txtEntry = new ZipEntry(outputFilename.replace(&quot;.pdf&quot;, &quot;.txt&quot;));</span>
+<span class="nc" id="L208">                zipOut.putNextEntry(txtEntry);</span>
+<span class="nc" id="L209">                Files.copy(sidecarTextPath, zipOut);</span>
+<span class="nc" id="L210">                zipOut.closeEntry();</span>
+            }
+
+<span class="nc" id="L213">            byte[] zipBytes = Files.readAllBytes(tempZipFile);</span>
+
+            // Clean up the temporary zip file
+<span class="nc" id="L216">            Files.delete(tempZipFile);</span>
+<span class="nc" id="L217">            Files.delete(tempOutputFile);</span>
+<span class="nc" id="L218">            Files.delete(sidecarTextPath);</span>
+
+            // Return the zip file containing both the PDF and the text file
+<span class="nc" id="L221">            return WebResponseUtils.bytesToWebResponse(</span>
+                    zipBytes, outputZipFilename, MediaType.APPLICATION_OCTET_STREAM);
+        } else {
+            // Return the OCR processed PDF as a response
+<span class="nc" id="L225">            Files.delete(tempOutputFile);</span>
+<span class="nc" id="L226">            return WebResponseUtils.bytesToWebResponse(pdfBytes, outputFilename);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

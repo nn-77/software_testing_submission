@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProcessExecutor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.utils</a> &gt; <span class="el_source">ProcessExecutor.java</span></div><h1>ProcessExecutor.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.utils;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.InterruptedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import io.github.pixee.security.BoundedLineReader;
+
+public class ProcessExecutor {
+
+<span class="nc" id="L23">    private static final Logger logger = LoggerFactory.getLogger(ProcessExecutor.class);</span>
+
+<span class="nc" id="L25">    public enum Processes {</span>
+<span class="nc" id="L26">        LIBRE_OFFICE,</span>
+<span class="nc" id="L27">        PDFTOHTML,</span>
+<span class="nc" id="L28">        OCR_MY_PDF,</span>
+<span class="nc" id="L29">        PYTHON_OPENCV,</span>
+<span class="nc" id="L30">        GHOSTSCRIPT,</span>
+<span class="nc" id="L31">        WEASYPRINT,</span>
+<span class="nc" id="L32">        INSTALL_APP,</span>
+<span class="nc" id="L33">        CALIBRE</span>
+    }
+
+<span class="nc" id="L36">    private static final Map&lt;Processes, ProcessExecutor&gt; instances = new ConcurrentHashMap&lt;&gt;();</span>
+
+    public static ProcessExecutor getInstance(Processes processType) {
+<span class="nc" id="L39">        return getInstance(processType, true);</span>
+    }
+
+    public static ProcessExecutor getInstance(Processes processType, boolean liveUpdates) {
+<span class="nc" id="L43">        return instances.computeIfAbsent(</span>
+                processType,
+                key -&gt; {
+<span class="nc" id="L46">                    int semaphoreLimit =</span>
+<span class="nc bnc" id="L47" title="All 9 branches missed.">                            switch (key) {</span>
+<span class="nc" id="L48">                                case LIBRE_OFFICE -&gt; 1;</span>
+<span class="nc" id="L49">                                case PDFTOHTML -&gt; 1;</span>
+<span class="nc" id="L50">                                case OCR_MY_PDF -&gt; 2;</span>
+<span class="nc" id="L51">                                case PYTHON_OPENCV -&gt; 8;</span>
+<span class="nc" id="L52">                                case GHOSTSCRIPT -&gt; 16;</span>
+<span class="nc" id="L53">                                case WEASYPRINT -&gt; 16;</span>
+<span class="nc" id="L54">                                case INSTALL_APP -&gt; 1;</span>
+<span class="nc" id="L55">                                case CALIBRE -&gt; 1;</span>
+                            };
+
+<span class="nc" id="L58">                    long timeoutMinutes =</span>
+<span class="nc bnc" id="L59" title="All 9 branches missed.">                            switch (key) {</span>
+<span class="nc" id="L60">                                case LIBRE_OFFICE -&gt; 30;</span>
+<span class="nc" id="L61">                                case PDFTOHTML -&gt; 5;</span>
+<span class="nc" id="L62">                                case OCR_MY_PDF -&gt; 30;</span>
+<span class="nc" id="L63">                                case PYTHON_OPENCV -&gt; 30;</span>
+<span class="nc" id="L64">                                case GHOSTSCRIPT -&gt; 5;</span>
+<span class="nc" id="L65">                                case WEASYPRINT -&gt; 30;</span>
+<span class="nc" id="L66">                                case INSTALL_APP -&gt; 60;</span>
+<span class="nc" id="L67">                                case CALIBRE -&gt; 30;</span>
+                            };
+<span class="nc" id="L69">                    return new ProcessExecutor(semaphoreLimit, liveUpdates, timeoutMinutes);</span>
+                });
+    }
+
+    private final Semaphore semaphore;
+    private final boolean liveUpdates;
+    private long timeoutDuration;
+
+<span class="nc" id="L77">    private ProcessExecutor(int semaphoreLimit, boolean liveUpdates, long timeout) {</span>
+<span class="nc" id="L78">        this.semaphore = new Semaphore(semaphoreLimit);</span>
+<span class="nc" id="L79">        this.liveUpdates = liveUpdates;</span>
+<span class="nc" id="L80">        this.timeoutDuration = timeout;</span>
+<span class="nc" id="L81">    }</span>
+
+    public ProcessExecutorResult runCommandWithOutputHandling(List&lt;String&gt; command)
+            throws IOException, InterruptedException {
+<span class="nc" id="L85">        return runCommandWithOutputHandling(command, null);</span>
+    }
+
+    public ProcessExecutorResult runCommandWithOutputHandling(
+            List&lt;String&gt; command, File workingDirectory) throws IOException, InterruptedException {
+<span class="nc" id="L90">        String messages = &quot;&quot;;</span>
+<span class="nc" id="L91">        int exitCode = 1;</span>
+<span class="nc" id="L92">        semaphore.acquire();</span>
+        try {
+
+<span class="nc" id="L95">            logger.info(&quot;Running command: &quot; + String.join(&quot; &quot;, command));</span>
+<span class="nc" id="L96">            ProcessBuilder processBuilder = new ProcessBuilder(command);</span>
+
+            // Use the working directory if it's set
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (workingDirectory != null) {</span>
+<span class="nc" id="L100">                processBuilder.directory(workingDirectory);</span>
+            }
+<span class="nc" id="L102">            Process process = processBuilder.start();</span>
+
+            // Read the error stream and standard output stream concurrently
+<span class="nc" id="L105">            List&lt;String&gt; errorLines = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L106">            List&lt;String&gt; outputLines = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L108">            Thread errorReaderThread =</span>
+                    new Thread(
+                            () -&gt; {
+<span class="nc" id="L111">                                try (BufferedReader errorReader =</span>
+                                        new BufferedReader(
+                                                new InputStreamReader(
+<span class="nc" id="L114">                                                        process.getErrorStream(),</span>
+                                                        StandardCharsets.UTF_8))) {
+                                    String line;
+<span class="nc" id="L117">                                    while ((line =</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                                                    BoundedLineReader.readLine(</span>
+                                                            errorReader, 5_000_000))
+                                            != null) {
+<span class="nc" id="L121">                                        errorLines.add(line);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                                        if (liveUpdates) logger.info(line);</span>
+                                    }
+<span class="nc" id="L124">                                } catch (InterruptedIOException e) {</span>
+<span class="nc" id="L125">                                    logger.warn(</span>
+                                            &quot;Error reader thread was interrupted due to timeout.&quot;);
+<span class="nc" id="L127">                                } catch (IOException e) {</span>
+<span class="nc" id="L128">                                    e.printStackTrace();</span>
+<span class="nc" id="L129">                                }</span>
+<span class="nc" id="L130">                            });</span>
+
+<span class="nc" id="L132">            Thread outputReaderThread =</span>
+                    new Thread(
+                            () -&gt; {
+<span class="nc" id="L135">                                try (BufferedReader outputReader =</span>
+                                        new BufferedReader(
+                                                new InputStreamReader(
+<span class="nc" id="L138">                                                        process.getInputStream(),</span>
+                                                        StandardCharsets.UTF_8))) {
+                                    String line;
+<span class="nc" id="L141">                                    while ((line =</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                                                    BoundedLineReader.readLine(</span>
+                                                            outputReader, 5_000_000))
+                                            != null) {
+<span class="nc" id="L145">                                        outputLines.add(line);</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                                        if (liveUpdates) logger.info(line);</span>
+                                    }
+<span class="nc" id="L148">                                } catch (InterruptedIOException e) {</span>
+<span class="nc" id="L149">                                    logger.warn(</span>
+                                            &quot;Error reader thread was interrupted due to timeout.&quot;);
+<span class="nc" id="L151">                                } catch (IOException e) {</span>
+<span class="nc" id="L152">                                    e.printStackTrace();</span>
+<span class="nc" id="L153">                                }</span>
+<span class="nc" id="L154">                            });</span>
+
+<span class="nc" id="L156">            errorReaderThread.start();</span>
+<span class="nc" id="L157">            outputReaderThread.start();</span>
+
+            // Wait for the conversion process to complete
+<span class="nc" id="L160">            boolean finished = process.waitFor(timeoutDuration, TimeUnit.MINUTES);</span>
+
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            if (!finished) {</span>
+                // Terminate the process
+<span class="nc" id="L164">                process.destroy();</span>
+                // Interrupt the reader threads
+<span class="nc" id="L166">                errorReaderThread.interrupt();</span>
+<span class="nc" id="L167">                outputReaderThread.interrupt();</span>
+<span class="nc" id="L168">                throw new IOException(&quot;Process timeout exceeded.&quot;);</span>
+            }
+<span class="nc" id="L170">            exitCode = process.exitValue();</span>
+            // Wait for the reader threads to finish
+<span class="nc" id="L172">            errorReaderThread.join();</span>
+<span class="nc" id="L173">            outputReaderThread.join();</span>
+
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (outputLines.size() &gt; 0) {</span>
+<span class="nc" id="L176">                String outputMessage = String.join(&quot;\n&quot;, outputLines);</span>
+<span class="nc" id="L177">                messages += outputMessage;</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">                if (!liveUpdates) {</span>
+<span class="nc" id="L179">                    logger.info(&quot;Command output:\n&quot; + outputMessage);</span>
+                }
+            }
+
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (errorLines.size() &gt; 0) {</span>
+<span class="nc" id="L184">                String errorMessage = String.join(&quot;\n&quot;, errorLines);</span>
+<span class="nc" id="L185">                messages += errorMessage;</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                if (!liveUpdates) {</span>
+<span class="nc" id="L187">                    logger.warn(&quot;Command error output:\n&quot; + errorMessage);</span>
+                }
+<span class="nc bnc" id="L189" title="All 2 branches missed.">                if (exitCode != 0) {</span>
+<span class="nc" id="L190">                    throw new IOException(</span>
+                            &quot;Command process failed with exit code &quot;
+                                    + exitCode
+                                    + &quot;. Error message: &quot;
+                                    + errorMessage);
+                }
+            }
+
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            if (exitCode != 0) {</span>
+<span class="nc" id="L199">                throw new IOException(</span>
+                        &quot;Command process failed with exit code &quot;
+                                + exitCode
+                                + &quot;\nLogs: &quot;
+                                + messages);
+            }
+        } finally {
+<span class="nc" id="L206">            semaphore.release();</span>
+        }
+<span class="nc" id="L208">        return new ProcessExecutorResult(exitCode, messages);</span>
+    }
+
+    public static class ProcessExecutorResult {
+        int rc;
+        String messages;
+
+<span class="nc" id="L215">        public ProcessExecutorResult(int rc, String messages) {</span>
+<span class="nc" id="L216">            this.rc = rc;</span>
+<span class="nc" id="L217">            this.messages = messages;</span>
+<span class="nc" id="L218">        }</span>
+
+        public int getRc() {
+<span class="nc" id="L221">            return rc;</span>
+        }
+
+        public void setRc(int rc) {
+<span class="nc" id="L225">            this.rc = rc;</span>
+<span class="nc" id="L226">        }</span>
+
+        public String getMessages() {
+<span class="nc" id="L229">            return messages;</span>
+        }
+
+        public void setMessages(String messages) {
+<span class="nc" id="L233">            this.messages = messages;</span>
+<span class="nc" id="L234">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

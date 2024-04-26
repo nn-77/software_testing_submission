@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PDFTableStripper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api.strippers</a> &gt; <span class="el_source">PDFTableStripper.java</span></div><h1>PDFTableStripper.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api.strippers;
+
+import java.awt.Shape;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Rectangle2D;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+
+import org.apache.fontbox.util.BoundingBox;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType3Font;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.PDFTextStripperByArea;
+import org.apache.pdfbox.text.TextPosition;
+
+/**
+ * Class to extract tabular data from a PDF. Works by making a first pass of the page to group all
+ * nearby text items together, and then inferring a 2D grid from these regions. Each table cell is
+ * then extracted using a PDFTextStripperByArea object.
+ *
+ * &lt;p&gt;Works best when headers are included in the detected region, to ensure representative text in
+ * every column.
+ *
+ * &lt;p&gt;Based upon DrawPrintTextLocations PDFBox example
+ * (https://svn.apache.org/viewvc/pdfbox/trunk/examples/src/main/java/org/apache/pdfbox/examples/util/DrawPrintTextLocations.java)
+ *
+ * @author Beldaz
+ */
+public class PDFTableStripper extends PDFTextStripper {
+
+    /**
+     * This will print the documents data, for each table cell.
+     *
+     * @param args The command line arguments.
+     * @throws IOException If there is an error parsing the document.
+     */
+    /*
+     *  Used in methods derived from DrawPrintTextLocations
+     */
+    private AffineTransform flipAT;
+
+    private AffineTransform rotateAT;
+
+    /** Regions updated by calls to writeString */
+    private Set&lt;Rectangle2D&gt; boxes;
+
+    // Border to allow when finding intersections
+<span class="nc" id="L58">    private double dx = 1.0; // This value works for me, feel free to tweak (or add setter)</span>
+<span class="nc" id="L59">    private double dy = 0.000; // Rows of text tend to overlap, so need to extend</span>
+
+    /** Region in which to find table (otherwise whole page) */
+    private Rectangle2D regionArea;
+
+    /** Number of rows in inferred table */
+<span class="nc" id="L65">    private int nRows = 0;</span>
+
+    /** Number of columns in inferred table */
+<span class="nc" id="L68">    private int nCols = 0;</span>
+
+    /** This is the object that does the text extraction */
+    private PDFTextStripperByArea regionStripper;
+
+    /**
+     * 1D intervals - used for calculateTableRegions()
+     *
+     * @author Beldaz
+     */
+    public static class Interval {
+        double start;
+        double end;
+
+<span class="nc" id="L82">        public Interval(double start, double end) {</span>
+<span class="nc" id="L83">            this.start = start;</span>
+<span class="nc" id="L84">            this.end = end;</span>
+<span class="nc" id="L85">        }</span>
+
+        public void add(Interval col) {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            if (col.start &lt; start) start = col.start;</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (col.end &gt; end) end = col.end;</span>
+<span class="nc" id="L90">        }</span>
+
+        public static void addTo(Interval x, LinkedList&lt;Interval&gt; columns) {
+<span class="nc" id="L93">            int p = 0;</span>
+<span class="nc" id="L94">            Iterator&lt;Interval&gt; it = columns.iterator();</span>
+            // Find where x should go
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L97">                Interval col = it.next();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                if (x.end &gt;= col.start) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                    if (x.start &lt;= col.end) { // overlaps</span>
+<span class="nc" id="L100">                        x.add(col);</span>
+<span class="nc" id="L101">                        it.remove();</span>
+                    }
+                    break;
+                }
+<span class="nc" id="L105">                ++p;</span>
+<span class="nc" id="L106">            }</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L108">                Interval col = it.next();</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                if (x.start &gt; col.end) break;</span>
+<span class="nc" id="L110">                x.add(col);</span>
+<span class="nc" id="L111">                it.remove();</span>
+<span class="nc" id="L112">            }</span>
+<span class="nc" id="L113">            columns.add(p, x);</span>
+<span class="nc" id="L114">        }</span>
+    }
+
+    /**
+     * Instantiate a new PDFTableStripper object.
+     *
+     * @param document
+     * @throws IOException If there is an error loading the properties.
+     */
+<span class="nc" id="L123">    public PDFTableStripper() throws IOException {</span>
+<span class="nc" id="L124">        super.setShouldSeparateByBeads(false);</span>
+<span class="nc" id="L125">        regionStripper = new PDFTextStripperByArea();</span>
+<span class="nc" id="L126">        regionStripper.setSortByPosition(true);</span>
+<span class="nc" id="L127">    }</span>
+
+    /**
+     * Define the region to group text by.
+     *
+     * @param rect The rectangle area to retrieve the text from.
+     */
+    public void setRegion(Rectangle2D rect) {
+<span class="nc" id="L135">        regionArea = rect;</span>
+<span class="nc" id="L136">    }</span>
+
+    public int getRows() {
+<span class="nc" id="L139">        return nRows;</span>
+    }
+
+    public int getColumns() {
+<span class="nc" id="L143">        return nCols;</span>
+    }
+
+    /**
+     * Get the text for the region, this should be called after extractTable().
+     *
+     * @return The text that was identified in that region.
+     */
+    public String getText(int row, int col) {
+<span class="nc" id="L152">        return regionStripper.getTextForRegion(&quot;el&quot; + col + &quot;x&quot; + row);</span>
+    }
+
+    public void extractTable(PDPage pdPage) throws IOException {
+<span class="nc" id="L156">        setStartPage(getCurrentPageNo());</span>
+<span class="nc" id="L157">        setEndPage(getCurrentPageNo());</span>
+
+<span class="nc" id="L159">        boxes = new HashSet&lt;Rectangle2D&gt;();</span>
+        // flip y-axis
+<span class="nc" id="L161">        flipAT = new AffineTransform();</span>
+<span class="nc" id="L162">        flipAT.translate(0, pdPage.getBBox().getHeight());</span>
+<span class="nc" id="L163">        flipAT.scale(1, -1);</span>
+
+        // page may be rotated
+<span class="nc" id="L166">        rotateAT = new AffineTransform();</span>
+<span class="nc" id="L167">        int rotation = pdPage.getRotation();</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (rotation != 0) {</span>
+<span class="nc" id="L169">            PDRectangle mediaBox = pdPage.getMediaBox();</span>
+<span class="nc bnc" id="L170" title="All 4 branches missed.">            switch (rotation) {</span>
+                case 90:
+<span class="nc" id="L172">                    rotateAT.translate(mediaBox.getHeight(), 0);</span>
+<span class="nc" id="L173">                    break;</span>
+                case 270:
+<span class="nc" id="L175">                    rotateAT.translate(0, mediaBox.getWidth());</span>
+<span class="nc" id="L176">                    break;</span>
+                case 180:
+<span class="nc" id="L178">                    rotateAT.translate(mediaBox.getWidth(), mediaBox.getHeight());</span>
+<span class="nc" id="L179">                    break;</span>
+                default:
+                    break;
+            }
+<span class="nc" id="L183">            rotateAT.rotate(Math.toRadians(rotation));</span>
+        }
+        // Trigger processing of the document so that writeString is called.
+<span class="nc" id="L186">        try (Writer dummy = new OutputStreamWriter(new ByteArrayOutputStream())) {</span>
+<span class="nc" id="L187">            super.output = dummy;</span>
+<span class="nc" id="L188">            super.processPage(pdPage);</span>
+        }
+
+<span class="nc" id="L191">        Rectangle2D[][] regions = calculateTableRegions();</span>
+
+        //        System.err.println(&quot;Drawing &quot; + nCols + &quot;x&quot; + nRows + &quot;=&quot;+ nRows*nCols + &quot;
+        // regions&quot;);
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        for (int i = 0; i &lt; nCols; ++i) {</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            for (int j = 0; j &lt; nRows; ++j) {</span>
+<span class="nc" id="L197">                final Rectangle2D region = regions[i][j];</span>
+<span class="nc" id="L198">                regionStripper.addRegion(&quot;el&quot; + i + &quot;x&quot; + j, region);</span>
+            }
+        }
+
+<span class="nc" id="L202">        regionStripper.extractRegions(pdPage);</span>
+<span class="nc" id="L203">    }</span>
+
+    /**
+     * Infer a rectangular grid of regions from the boxes field.
+     *
+     * @return 2D array of table regions (as Rectangle2D objects). Note that some of these regions
+     *     may have no content.
+     */
+    private Rectangle2D[][] calculateTableRegions() {
+
+        // Build up a list of all table regions, based upon the populated
+        // regions of boxes field. Treats the horizontal and vertical extents
+        // of each box as distinct
+<span class="nc" id="L216">        LinkedList&lt;Interval&gt; columns = new LinkedList&lt;Interval&gt;();</span>
+<span class="nc" id="L217">        LinkedList&lt;Interval&gt; rows = new LinkedList&lt;Interval&gt;();</span>
+
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        for (Rectangle2D box : boxes) {</span>
+<span class="nc" id="L220">            Interval x = new Interval(box.getMinX(), box.getMaxX());</span>
+<span class="nc" id="L221">            Interval y = new Interval(box.getMinY(), box.getMaxY());</span>
+
+<span class="nc" id="L223">            Interval.addTo(x, columns);</span>
+<span class="nc" id="L224">            Interval.addTo(y, rows);</span>
+<span class="nc" id="L225">        }</span>
+
+<span class="nc" id="L227">        nRows = rows.size();</span>
+<span class="nc" id="L228">        nCols = columns.size();</span>
+<span class="nc" id="L229">        Rectangle2D[][] regions = new Rectangle2D[nCols][nRows];</span>
+<span class="nc" id="L230">        int i = 0;</span>
+        // Label regions from top left, rather than the transformed orientation
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        for (Interval column : columns) {</span>
+<span class="nc" id="L233">            int j = 0;</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            for (Interval row : rows) {</span>
+<span class="nc" id="L235">                regions[nCols - i - 1][nRows - j - 1] =</span>
+                        new Rectangle2D.Double(
+                                column.start,
+                                row.start,
+                                column.end - column.start,
+                                row.end - row.start);
+<span class="nc" id="L241">                ++j;</span>
+<span class="nc" id="L242">            }</span>
+<span class="nc" id="L243">            ++i;</span>
+<span class="nc" id="L244">        }</span>
+
+<span class="nc" id="L246">        return regions;</span>
+    }
+
+    /**
+     * Register each character's bounding box, updating boxes field to maintain a list of all
+     * distinct groups of characters.
+     *
+     * &lt;p&gt;Overrides the default functionality of PDFTextStripper. Most of this is taken from
+     * DrawPrintTextLocations.java, with extra steps at end of main loop
+     */
+    @Override
+    protected void writeString(String string, List&lt;TextPosition&gt; textPositions) throws IOException {
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        for (TextPosition text : textPositions) {</span>
+            // glyph space -&gt; user space
+            // note: text.getTextMatrix() is *not* the Text Matrix, it's the Text Rendering Matrix
+<span class="nc" id="L261">            AffineTransform at = text.getTextMatrix().createAffineTransform();</span>
+<span class="nc" id="L262">            PDFont font = text.getFont();</span>
+<span class="nc" id="L263">            BoundingBox bbox = font.getBoundingBox();</span>
+
+            // advance width, bbox height (glyph space)
+<span class="nc" id="L266">            float xadvance =</span>
+<span class="nc" id="L267">                    font.getWidth(text.getCharacterCodes()[0]); // todo: should iterate all chars</span>
+<span class="nc" id="L268">            Rectangle2D.Float rect =</span>
+<span class="nc" id="L269">                    new Rectangle2D.Float(0, bbox.getLowerLeftY(), xadvance, bbox.getHeight());</span>
+
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            if (font instanceof PDType3Font) {</span>
+                // bbox and font matrix are unscaled
+<span class="nc" id="L273">                at.concatenate(font.getFontMatrix().createAffineTransform());</span>
+            } else {
+                // bbox and font matrix are already scaled to 1000
+<span class="nc" id="L276">                at.scale(1 / 1000f, 1 / 1000f);</span>
+            }
+<span class="nc" id="L278">            Shape s = at.createTransformedShape(rect);</span>
+<span class="nc" id="L279">            s = flipAT.createTransformedShape(s);</span>
+<span class="nc" id="L280">            s = rotateAT.createTransformedShape(s);</span>
+
+            //
+            // Merge character's bounding box with boxes field
+            //
+<span class="nc" id="L285">            Rectangle2D bounds = s.getBounds2D();</span>
+            // Pad sides to detect almost touching boxes
+<span class="nc" id="L287">            Rectangle2D hitbox = bounds.getBounds2D();</span>
+<span class="nc" id="L288">            hitbox.add(bounds.getMinX() - dx, bounds.getMinY() - dy);</span>
+<span class="nc" id="L289">            hitbox.add(bounds.getMaxX() + dx, bounds.getMaxY() + dy);</span>
+
+            // Find all overlapping boxes
+<span class="nc" id="L292">            List&lt;Rectangle2D&gt; intersectList = new ArrayList&lt;Rectangle2D&gt;();</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            for (Rectangle2D box : boxes) {</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">                if (box.intersects(hitbox)) {</span>
+<span class="nc" id="L295">                    intersectList.add(box);</span>
+                }
+<span class="nc" id="L297">            }</span>
+
+            // Combine all touching boxes and update
+            // (NOTE: Potentially this could leave some overlapping boxes un-merged,
+            // but it's sufficient for now and get's fixed up in calculateTableRegions)
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            for (Rectangle2D box : intersectList) {</span>
+<span class="nc" id="L303">                bounds.add(box);</span>
+<span class="nc" id="L304">                boxes.remove(box);</span>
+<span class="nc" id="L305">            }</span>
+<span class="nc" id="L306">            boxes.add(bounds);</span>
+<span class="nc" id="L307">        }</span>
+<span class="nc" id="L308">    }</span>
+
+    /**
+     * This method does nothing in this derived class, because beads and regions are incompatible.
+     * Beads are ignored when stripping by area.
+     *
+     * @param aShouldSeparateByBeads The new grouping of beads.
+     */
+    @Override
+<span class="nc" id="L317">    public final void setShouldSeparateByBeads(boolean aShouldSeparateByBeads) {}</span>
+
+    /** Adapted from PDFTextStripperByArea {@inheritDoc} */
+    @Override
+    protected void processTextPosition(TextPosition text) {
+<span class="nc bnc" id="L322" title="All 4 branches missed.">        if (regionArea != null &amp;&amp; !regionArea.contains(text.getX(), text.getY())) {</span>
+            // skip character
+        } else {
+<span class="nc" id="L325">            super.processTextPosition(text);</span>
+        }
+<span class="nc" id="L327">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

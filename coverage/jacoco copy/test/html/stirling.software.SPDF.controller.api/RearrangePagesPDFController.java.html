@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RearrangePagesPDFController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api</a> &gt; <span class="el_source">RearrangePagesPDFController.java</span></div><h1>RearrangePagesPDFController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.github.pixee.security.Filenames;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.SortTypes;
+import stirling.software.SPDF.model.api.PDFWithPageNums;
+import stirling.software.SPDF.model.api.general.RearrangePagesRequest;
+import stirling.software.SPDF.utils.GeneralUtils;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/general&quot;)
+@Tag(name = &quot;General&quot;, description = &quot;General APIs&quot;)
+<span class="nc" id="L33">public class RearrangePagesPDFController {</span>
+
+<span class="nc" id="L35">    private static final Logger logger = LoggerFactory.getLogger(RearrangePagesPDFController.class);</span>
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/remove-pages&quot;)
+    @Operation(
+            summary = &quot;Remove pages from a PDF file&quot;,
+            description =
+                    &quot;This endpoint removes specified pages from a given PDF file. Users can provide a comma-separated list of page numbers or ranges to delete. Input:PDF Output:PDF Type:SISO&quot;)
+    public ResponseEntity&lt;byte[]&gt; deletePages(@ModelAttribute PDFWithPageNums request)
+            throws IOException {
+
+<span class="nc" id="L45">        MultipartFile pdfFile = request.getFileInput();</span>
+<span class="nc" id="L46">        String pagesToDelete = request.getPageNumbers();</span>
+
+<span class="nc" id="L48">        PDDocument document = Loader.loadPDF(pdfFile.getBytes());</span>
+
+        // Split the page order string into an array of page numbers or range of numbers
+<span class="nc" id="L51">        String[] pageOrderArr = pagesToDelete.split(&quot;,&quot;);</span>
+
+<span class="nc" id="L53">        List&lt;Integer&gt; pagesToRemove =</span>
+<span class="nc" id="L54">                GeneralUtils.parsePageList(pageOrderArr, document.getNumberOfPages(), false);</span>
+
+<span class="nc" id="L56">        Collections.sort(pagesToRemove);</span>
+
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        for (int i = pagesToRemove.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L59">            int pageIndex = pagesToRemove.get(i);</span>
+<span class="nc" id="L60">            document.removePage(pageIndex);</span>
+        }
+<span class="nc" id="L62">        return WebResponseUtils.pdfDocToWebResponse(</span>
+                document,
+<span class="nc" id="L64">                Filenames.toSimpleFileName(pdfFile.getOriginalFilename())</span>
+<span class="nc" id="L65">                                .replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                        + &quot;_removed_pages.pdf&quot;);
+    }
+
+    private List&lt;Integer&gt; removeFirst(int totalPages) {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (totalPages &lt;= 1) return new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L71">        List&lt;Integer&gt; newPageOrder = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        for (int i = 2; i &lt;= totalPages; i++) {</span>
+<span class="nc" id="L73">            newPageOrder.add(i - 1);</span>
+        }
+<span class="nc" id="L75">        return newPageOrder;</span>
+    }
+
+    private List&lt;Integer&gt; removeLast(int totalPages) {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (totalPages &lt;= 1) return new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L80">        List&lt;Integer&gt; newPageOrder = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        for (int i = 1; i &lt; totalPages; i++) {</span>
+<span class="nc" id="L82">            newPageOrder.add(i - 1);</span>
+        }
+<span class="nc" id="L84">        return newPageOrder;</span>
+    }
+
+    private List&lt;Integer&gt; removeFirstAndLast(int totalPages) {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (totalPages &lt;= 2) return new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L89">        List&lt;Integer&gt; newPageOrder = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        for (int i = 2; i &lt; totalPages; i++) {</span>
+<span class="nc" id="L91">            newPageOrder.add(i - 1);</span>
+        }
+<span class="nc" id="L93">        return newPageOrder;</span>
+    }
+
+    private List&lt;Integer&gt; reverseOrder(int totalPages) {
+<span class="nc" id="L97">        List&lt;Integer&gt; newPageOrder = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        for (int i = totalPages; i &gt;= 1; i--) {</span>
+<span class="nc" id="L99">            newPageOrder.add(i - 1);</span>
+        }
+<span class="nc" id="L101">        return newPageOrder;</span>
+    }
+
+    private List&lt;Integer&gt; duplexSort(int totalPages) {
+<span class="nc" id="L105">        List&lt;Integer&gt; newPageOrder = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L106">        int half = (totalPages + 1) / 2; // This ensures proper behavior with odd numbers of pages</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        for (int i = 1; i &lt;= half; i++) {</span>
+<span class="nc" id="L108">            newPageOrder.add(i - 1);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            if (i &lt;= totalPages - half) { // Avoid going out of bounds</span>
+<span class="nc" id="L110">                newPageOrder.add(totalPages - i);</span>
+            }
+        }
+<span class="nc" id="L113">        return newPageOrder;</span>
+    }
+
+    private List&lt;Integer&gt; bookletSort(int totalPages) {
+<span class="nc" id="L117">        List&lt;Integer&gt; newPageOrder = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        for (int i = 0; i &lt; totalPages / 2; i++) {</span>
+<span class="nc" id="L119">            newPageOrder.add(i);</span>
+<span class="nc" id="L120">            newPageOrder.add(totalPages - i - 1);</span>
+        }
+<span class="nc" id="L122">        return newPageOrder;</span>
+    }
+
+    private List&lt;Integer&gt; sideStitchBooklet(int totalPages) {
+<span class="nc" id="L126">        List&lt;Integer&gt; newPageOrder = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        for (int i = 0; i &lt; (totalPages + 3) / 4; i++) {</span>
+<span class="nc" id="L128">            int begin = i * 4;</span>
+<span class="nc" id="L129">            newPageOrder.add(Math.min(begin + 3, totalPages - 1));</span>
+<span class="nc" id="L130">            newPageOrder.add(Math.min(begin, totalPages - 1));</span>
+<span class="nc" id="L131">            newPageOrder.add(Math.min(begin + 1, totalPages - 1));</span>
+<span class="nc" id="L132">            newPageOrder.add(Math.min(begin + 2, totalPages - 1));</span>
+        }
+<span class="nc" id="L134">        return newPageOrder;</span>
+    }
+
+    private List&lt;Integer&gt; oddEvenSplit(int totalPages) {
+<span class="nc" id="L138">        List&lt;Integer&gt; newPageOrder = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        for (int i = 1; i &lt;= totalPages; i += 2) {</span>
+<span class="nc" id="L140">            newPageOrder.add(i - 1);</span>
+        }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        for (int i = 2; i &lt;= totalPages; i += 2) {</span>
+<span class="nc" id="L143">            newPageOrder.add(i - 1);</span>
+        }
+<span class="nc" id="L145">        return newPageOrder;</span>
+    }
+
+    private List&lt;Integer&gt; processSortTypes(String sortTypes, int totalPages) {
+        try {
+<span class="nc" id="L150">            SortTypes mode = SortTypes.valueOf(sortTypes.toUpperCase());</span>
+<span class="nc bnc" id="L151" title="All 9 branches missed.">            switch (mode) {</span>
+                case REVERSE_ORDER:
+<span class="nc" id="L153">                    return reverseOrder(totalPages);</span>
+                case DUPLEX_SORT:
+<span class="nc" id="L155">                    return duplexSort(totalPages);</span>
+                case BOOKLET_SORT:
+<span class="nc" id="L157">                    return bookletSort(totalPages);</span>
+                case SIDE_STITCH_BOOKLET_SORT:
+<span class="nc" id="L159">                    return sideStitchBooklet(totalPages);</span>
+                case ODD_EVEN_SPLIT:
+<span class="nc" id="L161">                    return oddEvenSplit(totalPages);</span>
+                case REMOVE_FIRST:
+<span class="nc" id="L163">                    return removeFirst(totalPages);</span>
+                case REMOVE_LAST:
+<span class="nc" id="L165">                    return removeLast(totalPages);</span>
+                case REMOVE_FIRST_AND_LAST:
+<span class="nc" id="L167">                    return removeFirstAndLast(totalPages);</span>
+                default:
+<span class="nc" id="L169">                    throw new IllegalArgumentException(&quot;Unsupported custom mode&quot;);</span>
+            }
+<span class="nc" id="L171">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L172">            logger.error(&quot;Unsupported custom mode&quot;, e);</span>
+<span class="nc" id="L173">            return null;</span>
+        }
+    }
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/rearrange-pages&quot;)
+    @Operation(
+            summary = &quot;Rearrange pages in a PDF file&quot;,
+            description =
+                    &quot;This endpoint rearranges pages in a given PDF file based on the specified page order or custom mode. Users can provide a page order as a comma-separated list of page numbers or page ranges, or a custom mode. Input:PDF Output:PDF&quot;)
+    public ResponseEntity&lt;byte[]&gt; rearrangePages(@ModelAttribute RearrangePagesRequest request)
+            throws IOException {
+<span class="nc" id="L184">        MultipartFile pdfFile = request.getFileInput();</span>
+<span class="nc" id="L185">        String pageOrder = request.getPageNumbers();</span>
+<span class="nc" id="L186">        String sortType = request.getCustomMode();</span>
+        try {
+            // Load the input PDF
+<span class="nc" id="L189">            PDDocument document = Loader.loadPDF(pdfFile.getBytes());</span>
+
+            // Split the page order string into an array of page numbers or range of numbers
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            String[] pageOrderArr = pageOrder != null ? pageOrder.split(&quot;,&quot;) : new String[0];</span>
+<span class="nc" id="L193">            int totalPages = document.getNumberOfPages();</span>
+            List&lt;Integer&gt; newPageOrder;
+<span class="nc bnc" id="L195" title="All 4 branches missed.">            if (sortType != null &amp;&amp; sortType.length() &gt; 0) {</span>
+<span class="nc" id="L196">                newPageOrder = processSortTypes(sortType, totalPages);</span>
+            } else {
+<span class="nc" id="L198">                newPageOrder = GeneralUtils.parsePageList(pageOrderArr, totalPages, false);</span>
+            }
+<span class="nc" id="L200">            logger.info(&quot;newPageOrder = &quot; + newPageOrder);</span>
+<span class="nc" id="L201">            logger.info(&quot;totalPages = &quot; + totalPages);</span>
+            // Create a new list to hold the pages in the new order
+<span class="nc" id="L203">            List&lt;PDPage&gt; newPages = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            for (int i = 0; i &lt; newPageOrder.size(); i++) {</span>
+<span class="nc" id="L205">                newPages.add(document.getPage(newPageOrder.get(i)));</span>
+            }
+
+            // Remove all the pages from the original document
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            for (int i = document.getNumberOfPages() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L210">                document.removePage(i);</span>
+            }
+
+            // Add the pages in the new order
+<span class="nc bnc" id="L214" title="All 2 branches missed.">            for (PDPage page : newPages) {</span>
+<span class="nc" id="L215">                document.addPage(page);</span>
+<span class="nc" id="L216">            }</span>
+
+<span class="nc" id="L218">            return WebResponseUtils.pdfDocToWebResponse(</span>
+                    document,
+<span class="nc" id="L220">                    Filenames.toSimpleFileName(pdfFile.getOriginalFilename())</span>
+<span class="nc" id="L221">                                    .replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                            + &quot;_rearranged.pdf&quot;);
+<span class="nc" id="L223">        } catch (IOException e) {</span>
+<span class="nc" id="L224">            logger.error(&quot;Failed rearranging documents&quot;, e);</span>
+<span class="nc" id="L225">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

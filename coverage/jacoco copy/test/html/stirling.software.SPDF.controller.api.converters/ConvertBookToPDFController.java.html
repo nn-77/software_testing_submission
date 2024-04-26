@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConvertBookToPDFController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api.converters</a> &gt; <span class="el_source">ConvertBookToPDFController.java</span></div><h1>ConvertBookToPDFController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api.converters;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.github.pixee.security.Filenames;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.GeneralFile;
+import stirling.software.SPDF.utils.FileToPdf;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@Tag(name = &quot;Convert&quot;, description = &quot;Convert APIs&quot;)
+@RequestMapping(&quot;/api/v1/convert&quot;)
+<span class="nc" id="L23">public class ConvertBookToPDFController {</span>
+
+    @Autowired
+    @Qualifier(&quot;bookAndHtmlFormatsInstalled&quot;)
+    private boolean bookAndHtmlFormatsInstalled;
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/book/pdf&quot;)
+    @Operation(
+            summary =
+                    &quot;Convert a BOOK/comic (*.epub | *.mobi | *.azw3 | *.fb2 | *.txt | *.docx) to PDF&quot;,
+            description =
+                    &quot;(Requires bookAndHtmlFormatsInstalled flag and Calibre installed) This endpoint takes an BOOK/comic (*.epub | *.mobi | *.azw3 | *.fb2 | *.txt | *.docx)  input and converts it to PDF format.&quot;)
+    public ResponseEntity&lt;byte[]&gt; HtmlToPdf(@ModelAttribute GeneralFile request) throws Exception {
+<span class="nc" id="L36">        MultipartFile fileInput = request.getFileInput();</span>
+
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        if (!bookAndHtmlFormatsInstalled) {</span>
+<span class="nc" id="L39">            throw new IllegalArgumentException(</span>
+                    &quot;bookAndHtmlFormatsInstalled flag is False, this functionality is not available&quot;);
+        }
+
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if (fileInput == null) {</span>
+<span class="nc" id="L44">            throw new IllegalArgumentException(&quot;Please provide a file for conversion.&quot;);</span>
+        }
+
+<span class="nc" id="L47">        String originalFilename = Filenames.toSimpleFileName(fileInput.getOriginalFilename());</span>
+
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (originalFilename != null) {</span>
+<span class="nc" id="L50">            String originalFilenameLower = originalFilename.toLowerCase();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            if (!originalFilenameLower.endsWith(&quot;.epub&quot;)</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">                    &amp;&amp; !originalFilenameLower.endsWith(&quot;.mobi&quot;)</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">                    &amp;&amp; !originalFilenameLower.endsWith(&quot;.azw3&quot;)</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                    &amp;&amp; !originalFilenameLower.endsWith(&quot;.fb2&quot;)</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                    &amp;&amp; !originalFilenameLower.endsWith(&quot;.txt&quot;)</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                    &amp;&amp; !originalFilenameLower.endsWith(&quot;.docx&quot;)) {</span>
+<span class="nc" id="L57">                throw new IllegalArgumentException(</span>
+                        &quot;File must be in .epub, .mobi, .azw3, .fb2, .txt, or .docx format.&quot;);
+            }
+        }
+<span class="nc" id="L61">        byte[] pdfBytes = FileToPdf.convertBookTypeToPdf(fileInput.getBytes(), originalFilename);</span>
+
+<span class="nc" id="L63">        String outputFilename =</span>
+<span class="nc" id="L64">                originalFilename.replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                        + &quot;.pdf&quot;; // Remove file extension and append .pdf
+
+<span class="nc" id="L67">        return WebResponseUtils.bytesToWebResponse(pdfBytes, outputFilename);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

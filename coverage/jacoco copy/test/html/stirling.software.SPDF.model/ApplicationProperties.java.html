@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApplicationProperties.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.model</a> &gt; <span class="el_source">ApplicationProperties.java</span></div><h1>ApplicationProperties.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.model;
+
+import java.util.List;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+
+import stirling.software.SPDF.config.YamlPropertySourceFactory;
+
+@Configuration
+@ConfigurationProperties(prefix = &quot;&quot;)
+@PropertySource(value = &quot;file:./configs/settings.yml&quot;, factory = YamlPropertySourceFactory.class)
+<span class="nc" id="L14">public class ApplicationProperties {</span>
+    private Security security;
+    private System system;
+    private Ui ui;
+    private Endpoints endpoints;
+    private Metrics metrics;
+    private AutomaticallyGenerated automaticallyGenerated;
+    private AutoPipeline autoPipeline;
+
+    public AutoPipeline getAutoPipeline() {
+<span class="nc bnc" id="L24" title="All 2 branches missed.">        return autoPipeline != null ? autoPipeline : new AutoPipeline();</span>
+    }
+
+    public void setAutoPipeline(AutoPipeline autoPipeline) {
+<span class="nc" id="L28">        this.autoPipeline = autoPipeline;</span>
+<span class="nc" id="L29">    }</span>
+
+    public Security getSecurity() {
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        return security != null ? security : new Security();</span>
+    }
+
+    public void setSecurity(Security security) {
+<span class="nc" id="L36">        this.security = security;</span>
+<span class="nc" id="L37">    }</span>
+
+    public System getSystem() {
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        return system != null ? system : new System();</span>
+    }
+
+    public void setSystem(System system) {
+<span class="nc" id="L44">        this.system = system;</span>
+<span class="nc" id="L45">    }</span>
+
+    public Ui getUi() {
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        return ui != null ? ui : new Ui();</span>
+    }
+
+    public void setUi(Ui ui) {
+<span class="nc" id="L52">        this.ui = ui;</span>
+<span class="nc" id="L53">    }</span>
+
+    public Endpoints getEndpoints() {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        return endpoints != null ? endpoints : new Endpoints();</span>
+    }
+
+    public void setEndpoints(Endpoints endpoints) {
+<span class="nc" id="L60">        this.endpoints = endpoints;</span>
+<span class="nc" id="L61">    }</span>
+
+    public Metrics getMetrics() {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        return metrics != null ? metrics : new Metrics();</span>
+    }
+
+    public void setMetrics(Metrics metrics) {
+<span class="nc" id="L68">        this.metrics = metrics;</span>
+<span class="nc" id="L69">    }</span>
+
+    public AutomaticallyGenerated getAutomaticallyGenerated() {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        return automaticallyGenerated != null</span>
+<span class="nc" id="L73">                ? automaticallyGenerated</span>
+<span class="nc" id="L74">                : new AutomaticallyGenerated();</span>
+    }
+
+    public void setAutomaticallyGenerated(AutomaticallyGenerated automaticallyGenerated) {
+<span class="nc" id="L78">        this.automaticallyGenerated = automaticallyGenerated;</span>
+<span class="nc" id="L79">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L83">        return &quot;ApplicationProperties [security=&quot;</span>
+                + security
+                + &quot;, system=&quot;
+                + system
+                + &quot;, ui=&quot;
+                + ui
+                + &quot;, endpoints=&quot;
+                + endpoints
+                + &quot;, metrics=&quot;
+                + metrics
+                + &quot;, automaticallyGenerated=&quot;
+                + automaticallyGenerated
+                + &quot;, autoPipeline=&quot;
+                + autoPipeline
+                + &quot;]&quot;;
+    }
+
+<span class="nc" id="L100">    public static class AutoPipeline {</span>
+        private String outputFolder;
+
+        public String getOutputFolder() {
+<span class="nc" id="L104">            return outputFolder;</span>
+        }
+
+        public void setOutputFolder(String outputFolder) {
+<span class="nc" id="L108">            this.outputFolder = outputFolder;</span>
+<span class="nc" id="L109">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L113">            return &quot;AutoPipeline [outputFolder=&quot; + outputFolder + &quot;]&quot;;</span>
+        }
+    }
+
+<span class="nc" id="L117">    public static class Security {</span>
+        private Boolean enableLogin;
+        private Boolean csrfDisabled;
+        private InitialLogin initialLogin;
+        private int loginAttemptCount;
+        private long loginResetTimeMinutes;
+
+        public int getLoginAttemptCount() {
+<span class="nc" id="L125">            return loginAttemptCount;</span>
+        }
+
+        public void setLoginAttemptCount(int loginAttemptCount) {
+<span class="nc" id="L129">            this.loginAttemptCount = loginAttemptCount;</span>
+<span class="nc" id="L130">        }</span>
+
+        public long getLoginResetTimeMinutes() {
+<span class="nc" id="L133">            return loginResetTimeMinutes;</span>
+        }
+
+        public void setLoginResetTimeMinutes(long loginResetTimeMinutes) {
+<span class="nc" id="L137">            this.loginResetTimeMinutes = loginResetTimeMinutes;</span>
+<span class="nc" id="L138">        }</span>
+
+        public InitialLogin getInitialLogin() {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            return initialLogin != null ? initialLogin : new InitialLogin();</span>
+        }
+
+        public void setInitialLogin(InitialLogin initialLogin) {
+<span class="nc" id="L145">            this.initialLogin = initialLogin;</span>
+<span class="nc" id="L146">        }</span>
+
+        public Boolean getEnableLogin() {
+<span class="nc" id="L149">            return enableLogin;</span>
+        }
+
+        public void setEnableLogin(Boolean enableLogin) {
+<span class="nc" id="L153">            this.enableLogin = enableLogin;</span>
+<span class="nc" id="L154">        }</span>
+
+        public Boolean getCsrfDisabled() {
+<span class="nc" id="L157">            return csrfDisabled;</span>
+        }
+
+        public void setCsrfDisabled(Boolean csrfDisabled) {
+<span class="nc" id="L161">            this.csrfDisabled = csrfDisabled;</span>
+<span class="nc" id="L162">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L166">            return &quot;Security [enableLogin=&quot;</span>
+                    + enableLogin
+                    + &quot;, initialLogin=&quot;
+                    + initialLogin
+                    + &quot;,  csrfDisabled=&quot;
+                    + csrfDisabled
+                    + &quot;]&quot;;
+        }
+
+<span class="nc" id="L175">        public static class InitialLogin {</span>
+
+            private String username;
+            private String password;
+
+            public String getUsername() {
+<span class="nc" id="L181">                return username;</span>
+            }
+
+            public void setUsername(String username) {
+<span class="nc" id="L185">                this.username = username;</span>
+<span class="nc" id="L186">            }</span>
+
+            public String getPassword() {
+<span class="nc" id="L189">                return password;</span>
+            }
+
+            public void setPassword(String password) {
+<span class="nc" id="L193">                this.password = password;</span>
+<span class="nc" id="L194">            }</span>
+
+            @Override
+            public String toString() {
+<span class="nc" id="L198">                return &quot;InitialLogin [username=&quot;</span>
+                        + username
+                        + &quot;, password=&quot;
+<span class="nc bnc" id="L201" title="All 4 branches missed.">                        + (password != null &amp;&amp; !password.isEmpty() ? &quot;MASKED&quot; : &quot;NULL&quot;)</span>
+                        + &quot;]&quot;;
+            }
+        }
+    }
+
+<span class="nc" id="L207">    public static class System {</span>
+        private String defaultLocale;
+        private Boolean googlevisibility;
+        private String rootURIPath;
+        private String customStaticFilePath;
+        private Integer maxFileSize;
+
+        private Boolean enableAlphaFunctionality;
+
+        public Boolean getEnableAlphaFunctionality() {
+<span class="nc" id="L217">            return enableAlphaFunctionality;</span>
+        }
+
+        public void setEnableAlphaFunctionality(Boolean enableAlphaFunctionality) {
+<span class="nc" id="L221">            this.enableAlphaFunctionality = enableAlphaFunctionality;</span>
+<span class="nc" id="L222">        }</span>
+
+        public String getDefaultLocale() {
+<span class="nc" id="L225">            return defaultLocale;</span>
+        }
+
+        public void setDefaultLocale(String defaultLocale) {
+<span class="nc" id="L229">            this.defaultLocale = defaultLocale;</span>
+<span class="nc" id="L230">        }</span>
+
+        public Boolean getGooglevisibility() {
+<span class="nc" id="L233">            return googlevisibility;</span>
+        }
+
+        public void setGooglevisibility(Boolean googlevisibility) {
+<span class="nc" id="L237">            this.googlevisibility = googlevisibility;</span>
+<span class="nc" id="L238">        }</span>
+
+        public String getRootURIPath() {
+<span class="nc" id="L241">            return rootURIPath;</span>
+        }
+
+        public void setRootURIPath(String rootURIPath) {
+<span class="nc" id="L245">            this.rootURIPath = rootURIPath;</span>
+<span class="nc" id="L246">        }</span>
+
+        public String getCustomStaticFilePath() {
+<span class="nc" id="L249">            return customStaticFilePath;</span>
+        }
+
+        public void setCustomStaticFilePath(String customStaticFilePath) {
+<span class="nc" id="L253">            this.customStaticFilePath = customStaticFilePath;</span>
+<span class="nc" id="L254">        }</span>
+
+        public Integer getMaxFileSize() {
+<span class="nc" id="L257">            return maxFileSize;</span>
+        }
+
+        public void setMaxFileSize(Integer maxFileSize) {
+<span class="nc" id="L261">            this.maxFileSize = maxFileSize;</span>
+<span class="nc" id="L262">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L266">            return &quot;System [defaultLocale=&quot;</span>
+                    + defaultLocale
+                    + &quot;, googlevisibility=&quot;
+                    + googlevisibility
+                    + &quot;, rootURIPath=&quot;
+                    + rootURIPath
+                    + &quot;, customStaticFilePath=&quot;
+                    + customStaticFilePath
+                    + &quot;, maxFileSize=&quot;
+                    + maxFileSize
+                    + &quot;, enableAlphaFunctionality=&quot;
+                    + enableAlphaFunctionality
+                    + &quot;]&quot;;
+        }
+    }
+
+<span class="nc" id="L282">    public static class Ui {</span>
+        private String appName;
+        private String homeDescription;
+        private String appNameNavbar;
+
+        public String getAppName() {
+<span class="nc bnc" id="L288" title="All 4 branches missed.">            if (appName != null &amp;&amp; appName.trim().length() == 0) return null;</span>
+<span class="nc" id="L289">            return appName;</span>
+        }
+
+        public void setAppName(String appName) {
+<span class="nc" id="L293">            this.appName = appName;</span>
+<span class="nc" id="L294">        }</span>
+
+        public String getHomeDescription() {
+<span class="nc bnc" id="L297" title="All 4 branches missed.">            if (homeDescription != null &amp;&amp; homeDescription.trim().length() == 0) return null;</span>
+<span class="nc" id="L298">            return homeDescription;</span>
+        }
+
+        public void setHomeDescription(String homeDescription) {
+<span class="nc" id="L302">            this.homeDescription = homeDescription;</span>
+<span class="nc" id="L303">        }</span>
+
+        public String getAppNameNavbar() {
+<span class="nc bnc" id="L306" title="All 4 branches missed.">            if (appNameNavbar != null &amp;&amp; appNameNavbar.trim().length() == 0) return null;</span>
+<span class="nc" id="L307">            return appNameNavbar;</span>
+        }
+
+        public void setAppNameNavbar(String appNameNavbar) {
+<span class="nc" id="L311">            this.appNameNavbar = appNameNavbar;</span>
+<span class="nc" id="L312">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L316">            return &quot;UserInterface [appName=&quot;</span>
+                    + appName
+                    + &quot;, homeDescription=&quot;
+                    + homeDescription
+                    + &quot;, appNameNavbar=&quot;
+                    + appNameNavbar
+                    + &quot;]&quot;;
+        }
+    }
+
+<span class="nc" id="L326">    public static class Endpoints {</span>
+        private List&lt;String&gt; toRemove;
+        private List&lt;String&gt; groupsToRemove;
+
+        public List&lt;String&gt; getToRemove() {
+<span class="nc" id="L331">            return toRemove;</span>
+        }
+
+        public void setToRemove(List&lt;String&gt; toRemove) {
+<span class="nc" id="L335">            this.toRemove = toRemove;</span>
+<span class="nc" id="L336">        }</span>
+
+        public List&lt;String&gt; getGroupsToRemove() {
+<span class="nc" id="L339">            return groupsToRemove;</span>
+        }
+
+        public void setGroupsToRemove(List&lt;String&gt; groupsToRemove) {
+<span class="nc" id="L343">            this.groupsToRemove = groupsToRemove;</span>
+<span class="nc" id="L344">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L348">            return &quot;Endpoints [toRemove=&quot; + toRemove + &quot;, groupsToRemove=&quot; + groupsToRemove + &quot;]&quot;;</span>
+        }
+    }
+
+<span class="nc" id="L352">    public static class Metrics {</span>
+        private Boolean enabled;
+
+        public Boolean getEnabled() {
+<span class="nc" id="L356">            return enabled;</span>
+        }
+
+        public void setEnabled(Boolean enabled) {
+<span class="nc" id="L360">            this.enabled = enabled;</span>
+<span class="nc" id="L361">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L365">            return &quot;Metrics [enabled=&quot; + enabled + &quot;]&quot;;</span>
+        }
+    }
+
+<span class="nc" id="L369">    public static class AutomaticallyGenerated {</span>
+        private String key;
+
+        public String getKey() {
+<span class="nc" id="L373">            return key;</span>
+        }
+
+        public void setKey(String key) {
+<span class="nc" id="L377">            this.key = key;</span>
+<span class="nc" id="L378">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L382">            return &quot;AutomaticallyGenerated [key=&quot;</span>
+<span class="nc bnc" id="L383" title="All 4 branches missed.">                    + (key != null &amp;&amp; !key.isEmpty() ? &quot;MASKED&quot; : &quot;NULL&quot;)</span>
+                    + &quot;]&quot;;
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

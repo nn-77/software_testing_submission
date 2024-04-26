@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FirstLoginFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.config.security</a> &gt; <span class="el_source">FirstLoginFilter.java</span></div><h1>FirstLoginFilter.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.config.security;
+
+import java.io.IOException;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import stirling.software.SPDF.model.User;
+import stirling.software.SPDF.utils.RequestUriUtils;
+
+@Component
+<span class="nc" id="L21">public class FirstLoginFilter extends OncePerRequestFilter {</span>
+
+    @Autowired @Lazy private UserService userService;
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+<span class="nc" id="L29">        String method = request.getMethod();</span>
+<span class="nc" id="L30">        String requestURI = request.getRequestURI();</span>
+        // Check if the request is for static resources
+<span class="nc" id="L32">        boolean isStaticResource = RequestUriUtils.isStaticResource(requestURI);</span>
+
+        // If it's a static resource, just continue the filter chain and skip the logic below
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        if (isStaticResource) {</span>
+<span class="nc" id="L36">            filterChain.doFilter(request, response);</span>
+<span class="nc" id="L37">            return;</span>
+        }
+
+<span class="nc" id="L40">        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="nc bnc" id="L41" title="All 4 branches missed.">        if (authentication != null &amp;&amp; authentication.isAuthenticated()) {</span>
+<span class="nc" id="L42">            Optional&lt;User&gt; user = userService.findByUsername(authentication.getName());</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            if (&quot;GET&quot;.equalsIgnoreCase(method)</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">                    &amp;&amp; user.isPresent()</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">                    &amp;&amp; user.get().isFirstLogin()</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">                    &amp;&amp; !&quot;/change-creds&quot;.equals(requestURI)) {</span>
+<span class="nc" id="L47">                response.sendRedirect(&quot;/change-creds&quot;);</span>
+<span class="nc" id="L48">                return;</span>
+            }
+        }
+<span class="nc" id="L51">        filterChain.doFilter(request, response);</span>
+<span class="nc" id="L52">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

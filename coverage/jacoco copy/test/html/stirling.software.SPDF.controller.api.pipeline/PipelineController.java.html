@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PipelineController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api.pipeline</a> &gt; <span class="el_source">PipelineController.java</span></div><h1>PipelineController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api.pipeline;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.ApplicationProperties;
+import stirling.software.SPDF.model.PipelineConfig;
+import stirling.software.SPDF.model.api.HandleDataRequest;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/pipeline&quot;)
+@Tag(name = &quot;Pipeline&quot;, description = &quot;Pipeline APIs&quot;)
+<span class="nc" id="L37">public class PipelineController {</span>
+
+<span class="nc" id="L39">    private static final Logger logger = LoggerFactory.getLogger(PipelineController.class);</span>
+
+<span class="nc" id="L41">    final String watchedFoldersDir = &quot;./pipeline/watchedFolders/&quot;;</span>
+<span class="nc" id="L42">    final String finishedFoldersDir = &quot;./pipeline/finishedFolders/&quot;;</span>
+    @Autowired PipelineProcessor processor;
+
+    @Autowired ApplicationProperties applicationProperties;
+
+    @Autowired private ObjectMapper objectMapper;
+
+    @PostMapping(&quot;/handleData&quot;)
+    public ResponseEntity&lt;byte[]&gt; handleData(@ModelAttribute HandleDataRequest request)
+            throws JsonMappingException, JsonProcessingException {
+
+<span class="nc" id="L53">        MultipartFile[] files = request.getFileInput();</span>
+<span class="nc" id="L54">        String jsonString = request.getJson();</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (files == null) {</span>
+<span class="nc" id="L56">            return null;</span>
+        }
+<span class="nc" id="L58">        PipelineConfig config = objectMapper.readValue(jsonString, PipelineConfig.class);</span>
+<span class="nc" id="L59">        logger.info(&quot;Received POST request to /handleData with {} files&quot;, files.length);</span>
+        try {
+<span class="nc" id="L61">            List&lt;Resource&gt; inputFiles = processor.generateInputFiles(files);</span>
+<span class="nc bnc" id="L62" title="All 4 branches missed.">            if (inputFiles == null || inputFiles.size() == 0) {</span>
+<span class="nc" id="L63">                return null;</span>
+            }
+<span class="nc" id="L65">            List&lt;Resource&gt; outputFiles = processor.runPipelineAgainstFiles(inputFiles, config);</span>
+<span class="nc bnc" id="L66" title="All 4 branches missed.">            if (outputFiles != null &amp;&amp; outputFiles.size() == 1) {</span>
+                // If there is only one file, return it directly
+<span class="nc" id="L68">                Resource singleFile = outputFiles.get(0);</span>
+<span class="nc" id="L69">                InputStream is = singleFile.getInputStream();</span>
+<span class="nc" id="L70">                byte[] bytes = new byte[(int) singleFile.contentLength()];</span>
+<span class="nc" id="L71">                is.read(bytes);</span>
+<span class="nc" id="L72">                is.close();</span>
+
+<span class="nc" id="L74">                logger.info(&quot;Returning single file response...&quot;);</span>
+<span class="nc" id="L75">                return WebResponseUtils.bytesToWebResponse(</span>
+<span class="nc" id="L76">                        bytes, singleFile.getFilename(), MediaType.APPLICATION_OCTET_STREAM);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            } else if (outputFiles == null) {</span>
+<span class="nc" id="L78">                return null;</span>
+            }
+
+            // Create a ByteArrayOutputStream to hold the zip
+<span class="nc" id="L82">            ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L83">            ZipOutputStream zipOut = new ZipOutputStream(baos);</span>
+
+            // A map to keep track of filenames and their counts
+<span class="nc" id="L86">            Map&lt;String, Integer&gt; filenameCount = new HashMap&lt;&gt;();</span>
+
+            // Loop through each file and add it to the zip
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            for (Resource file : outputFiles) {</span>
+<span class="nc" id="L90">                String originalFilename = file.getFilename();</span>
+<span class="nc" id="L91">                String filename = originalFilename;</span>
+
+                // Check if the filename already exists, and modify it if necessary
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                if (filenameCount.containsKey(originalFilename)) {</span>
+<span class="nc" id="L95">                    int count = filenameCount.get(originalFilename);</span>
+<span class="nc" id="L96">                    String baseName = originalFilename.replaceAll(&quot;\\.[^.]*$&quot;, &quot;&quot;);</span>
+<span class="nc" id="L97">                    String extension = originalFilename.replaceAll(&quot;^.*\\.&quot;, &quot;&quot;);</span>
+<span class="nc" id="L98">                    filename = baseName + &quot;(&quot; + count + &quot;).&quot; + extension;</span>
+<span class="nc" id="L99">                    filenameCount.put(originalFilename, count + 1);</span>
+<span class="nc" id="L100">                } else {</span>
+<span class="nc" id="L101">                    filenameCount.put(originalFilename, 1);</span>
+                }
+
+<span class="nc" id="L104">                ZipEntry zipEntry = new ZipEntry(filename);</span>
+<span class="nc" id="L105">                zipOut.putNextEntry(zipEntry);</span>
+
+                // Read the file into a byte array
+<span class="nc" id="L108">                InputStream is = file.getInputStream();</span>
+<span class="nc" id="L109">                byte[] bytes = new byte[(int) file.contentLength()];</span>
+<span class="nc" id="L110">                is.read(bytes);</span>
+
+                // Write the bytes of the file to the zip
+<span class="nc" id="L113">                zipOut.write(bytes, 0, bytes.length);</span>
+<span class="nc" id="L114">                zipOut.closeEntry();</span>
+
+<span class="nc" id="L116">                is.close();</span>
+<span class="nc" id="L117">            }</span>
+
+<span class="nc" id="L119">            zipOut.close();</span>
+
+<span class="nc" id="L121">            logger.info(&quot;Returning zipped file response...&quot;);</span>
+<span class="nc" id="L122">            return WebResponseUtils.boasToWebResponse(</span>
+                    baos, &quot;output.zip&quot;, MediaType.APPLICATION_OCTET_STREAM);
+<span class="nc" id="L124">        } catch (Exception e) {</span>
+<span class="nc" id="L125">            logger.error(&quot;Error handling data: &quot;, e);</span>
+<span class="nc" id="L126">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

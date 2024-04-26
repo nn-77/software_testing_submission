@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConvertImgPDFController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api.converters</a> &gt; <span class="el_source">ConvertImgPDFController.java</span></div><h1>ConvertImgPDFController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api.converters;
+
+import java.io.IOException;
+import java.net.URLConnection;
+
+import org.apache.pdfbox.rendering.ImageType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.github.pixee.security.Filenames;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.converters.ConvertToImageRequest;
+import stirling.software.SPDF.model.api.converters.ConvertToPdfRequest;
+import stirling.software.SPDF.utils.PdfUtils;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/convert&quot;)
+@Tag(name = &quot;Convert&quot;, description = &quot;Convert APIs&quot;)
+<span class="nc" id="L33">public class ConvertImgPDFController {</span>
+
+<span class="nc" id="L35">    private static final Logger logger = LoggerFactory.getLogger(ConvertImgPDFController.class);</span>
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/pdf/img&quot;)
+    @Operation(
+            summary = &quot;Convert PDF to image(s)&quot;,
+            description =
+                    &quot;This endpoint converts a PDF file to image(s) with the specified image format, color type, and DPI. Users can choose to get a single image or multiple images.  Input:PDF Output:Image Type:SI-Conditional&quot;)
+    public ResponseEntity&lt;Resource&gt; convertToImage(@ModelAttribute ConvertToImageRequest request)
+            throws IOException {
+<span class="nc" id="L44">        MultipartFile file = request.getFileInput();</span>
+<span class="nc" id="L45">        String imageFormat = request.getImageFormat();</span>
+<span class="nc" id="L46">        String singleOrMultiple = request.getSingleOrMultiple();</span>
+<span class="nc" id="L47">        String colorType = request.getColorType();</span>
+<span class="nc" id="L48">        String dpi = request.getDpi();</span>
+
+<span class="nc" id="L50">        byte[] pdfBytes = file.getBytes();</span>
+<span class="nc" id="L51">        ImageType colorTypeResult = ImageType.RGB;</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (&quot;greyscale&quot;.equals(colorType)) {</span>
+<span class="nc" id="L53">            colorTypeResult = ImageType.GRAY;</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        } else if (&quot;blackwhite&quot;.equals(colorType)) {</span>
+<span class="nc" id="L55">            colorTypeResult = ImageType.BINARY;</span>
+        }
+        // returns bytes for image
+<span class="nc" id="L58">        boolean singleImage = &quot;single&quot;.equals(singleOrMultiple);</span>
+<span class="nc" id="L59">        byte[] result = null;</span>
+<span class="nc" id="L60">        String filename =</span>
+<span class="nc" id="L61">                Filenames.toSimpleFileName(file.getOriginalFilename())</span>
+<span class="nc" id="L62">                        .replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;);</span>
+        try {
+<span class="nc" id="L64">            result =</span>
+<span class="nc" id="L65">                    PdfUtils.convertFromPdf(</span>
+                            pdfBytes,
+<span class="nc" id="L67">                            imageFormat.toUpperCase(),</span>
+                            colorTypeResult,
+                            singleImage,
+<span class="nc" id="L70">                            Integer.valueOf(dpi),</span>
+                            filename);
+<span class="nc" id="L72">        } catch (IOException e) {</span>
+            // TODO Auto-generated catch block
+<span class="nc" id="L74">            e.printStackTrace();</span>
+<span class="nc" id="L75">        } catch (Exception e) {</span>
+            // TODO Auto-generated catch block
+<span class="nc" id="L77">            e.printStackTrace();</span>
+<span class="nc" id="L78">        }</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (singleImage) {</span>
+<span class="nc" id="L80">            HttpHeaders headers = new HttpHeaders();</span>
+<span class="nc" id="L81">            headers.setContentType(MediaType.parseMediaType(getMediaType(imageFormat)));</span>
+<span class="nc" id="L82">            ResponseEntity&lt;Resource&gt; response =</span>
+                    new ResponseEntity&lt;&gt;(new ByteArrayResource(result), headers, HttpStatus.OK);
+<span class="nc" id="L84">            return response;</span>
+        } else {
+<span class="nc" id="L86">            ByteArrayResource resource = new ByteArrayResource(result);</span>
+            // return the Resource in the response
+<span class="nc" id="L88">            return ResponseEntity.ok()</span>
+<span class="nc" id="L89">                    .header(</span>
+                            HttpHeaders.CONTENT_DISPOSITION,
+                            &quot;attachment; filename=&quot; + filename + &quot;_convertedToImages.zip&quot;)
+<span class="nc" id="L92">                    .contentType(MediaType.APPLICATION_OCTET_STREAM)</span>
+<span class="nc" id="L93">                    .contentLength(resource.contentLength())</span>
+<span class="nc" id="L94">                    .body(resource);</span>
+        }
+    }
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/img/pdf&quot;)
+    @Operation(
+            summary = &quot;Convert images to a PDF file&quot;,
+            description =
+                    &quot;This endpoint converts one or more images to a PDF file. Users can specify whether to stretch the images to fit the PDF page, and whether to automatically rotate the images. Input:Image Output:PDF Type:MISO&quot;)
+    public ResponseEntity&lt;byte[]&gt; convertToPdf(@ModelAttribute ConvertToPdfRequest request)
+            throws IOException {
+<span class="nc" id="L105">        MultipartFile[] file = request.getFileInput();</span>
+<span class="nc" id="L106">        String fitOption = request.getFitOption();</span>
+<span class="nc" id="L107">        String colorType = request.getColorType();</span>
+<span class="nc" id="L108">        boolean autoRotate = request.isAutoRotate();</span>
+
+        // Convert the file to PDF and get the resulting bytes
+<span class="nc" id="L111">        byte[] bytes = PdfUtils.imageToPdf(file, fitOption, autoRotate, colorType);</span>
+<span class="nc" id="L112">        return WebResponseUtils.bytesToWebResponse(</span>
+                bytes,
+<span class="nc" id="L114">                file[0].getOriginalFilename().replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;) + &quot;_converted.pdf&quot;);</span>
+    }
+
+    private String getMediaType(String imageFormat) {
+<span class="nc" id="L118">        String mimeType = URLConnection.guessContentTypeFromName(&quot;.&quot; + imageFormat);</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        return &quot;null&quot;.equals(mimeType) ? &quot;application/octet-stream&quot; : mimeType;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CropController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api</a> &gt; <span class="el_source">CropController.java</span></div><h1>CropController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.multipdf.LayerUtility;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.PDPageContentStream.AppendMode;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.general.CropPdfForm;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/general&quot;)
+@Tag(name = &quot;General&quot;, description = &quot;General APIs&quot;)
+<span class="nc" id="L31">public class CropController {</span>
+
+<span class="nc" id="L33">    private static final Logger logger = LoggerFactory.getLogger(CropController.class);</span>
+
+    @PostMapping(value = &quot;/crop&quot;, consumes = &quot;multipart/form-data&quot;)
+    @Operation(
+            summary = &quot;Crops a PDF document&quot;,
+            description =
+                    &quot;This operation takes an input PDF file and crops it according to the given coordinates. Input:PDF Output:PDF Type:SISO&quot;)
+    public ResponseEntity&lt;byte[]&gt; cropPdf(@ModelAttribute CropPdfForm form) throws IOException {
+<span class="nc" id="L41">        PDDocument sourceDocument = Loader.loadPDF(form.getFileInput().getBytes());</span>
+
+<span class="nc" id="L43">        PDDocument newDocument = new PDDocument();</span>
+
+<span class="nc" id="L45">        int totalPages = sourceDocument.getNumberOfPages();</span>
+
+<span class="nc" id="L47">        LayerUtility layerUtility = new LayerUtility(newDocument);</span>
+
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        for (int i = 0; i &lt; totalPages; i++) {</span>
+<span class="nc" id="L50">            PDPage sourcePage = sourceDocument.getPage(i);</span>
+
+            // Create a new page with the size of the source page
+<span class="nc" id="L53">            PDPage newPage = new PDPage(sourcePage.getMediaBox());</span>
+<span class="nc" id="L54">            newDocument.addPage(newPage);</span>
+<span class="nc" id="L55">            PDPageContentStream contentStream =</span>
+                    new PDPageContentStream(newDocument, newPage, AppendMode.OVERWRITE, true, true);
+
+            // Import the source page as a form XObject
+<span class="nc" id="L59">            PDFormXObject formXObject = layerUtility.importPageAsForm(sourceDocument, i);</span>
+
+<span class="nc" id="L61">            contentStream.saveGraphicsState();</span>
+
+            // Define the crop area
+<span class="nc" id="L64">            contentStream.addRect(form.getX(), form.getY(), form.getWidth(), form.getHeight());</span>
+<span class="nc" id="L65">            contentStream.clip();</span>
+
+            // Draw the entire formXObject
+<span class="nc" id="L68">            contentStream.drawForm(formXObject);</span>
+
+<span class="nc" id="L70">            contentStream.restoreGraphicsState();</span>
+
+<span class="nc" id="L72">            contentStream.close();</span>
+
+            // Now, set the new page's media box to the cropped size
+<span class="nc" id="L75">            newPage.setMediaBox(</span>
+<span class="nc" id="L76">                    new PDRectangle(form.getX(), form.getY(), form.getWidth(), form.getHeight()));</span>
+        }
+
+<span class="nc" id="L79">        ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L80">        newDocument.save(baos);</span>
+<span class="nc" id="L81">        newDocument.close();</span>
+<span class="nc" id="L82">        sourceDocument.close();</span>
+
+<span class="nc" id="L84">        byte[] pdfContent = baos.toByteArray();</span>
+<span class="nc" id="L85">        return WebResponseUtils.bytesToWebResponse(</span>
+                pdfContent,
+<span class="nc" id="L87">                form.getFileInput().getOriginalFilename().replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                        + &quot;_cropped.pdf&quot;);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

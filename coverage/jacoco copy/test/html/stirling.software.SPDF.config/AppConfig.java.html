@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.config</a> &gt; <span class="el_source">AppConfig.java</span></div><h1>AppConfig.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.config;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Properties;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+
+import stirling.software.SPDF.model.ApplicationProperties;
+
+@Configuration
+<span class="nc" id="L17">public class AppConfig {</span>
+
+    @Autowired ApplicationProperties applicationProperties;
+
+    @Bean(name = &quot;loginEnabled&quot;)
+    public boolean loginEnabled() {
+<span class="nc" id="L23">        return applicationProperties.getSecurity().getEnableLogin();</span>
+    }
+
+    @Bean(name = &quot;appName&quot;)
+    public String appName() {
+<span class="nc" id="L28">        String homeTitle = applicationProperties.getUi().getAppName();</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        return (homeTitle != null) ? homeTitle : &quot;Stirling PDF&quot;;</span>
+    }
+
+    @Bean(name = &quot;appVersion&quot;)
+    public String appVersion() {
+<span class="nc" id="L34">        Resource resource = new ClassPathResource(&quot;version.properties&quot;);</span>
+<span class="nc" id="L35">        Properties props = new Properties();</span>
+        try {
+<span class="nc" id="L37">            props.load(resource.getInputStream());</span>
+<span class="nc" id="L38">            return props.getProperty(&quot;version&quot;);</span>
+<span class="nc" id="L39">        } catch (IOException e) {</span>
+<span class="nc" id="L40">            e.printStackTrace();</span>
+        }
+<span class="nc" id="L42">        return &quot;0.0.0&quot;;</span>
+    }
+
+    @Bean(name = &quot;homeText&quot;)
+    public String homeText() {
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        return (applicationProperties.getUi().getHomeDescription() != null)</span>
+<span class="nc" id="L48">                ? applicationProperties.getUi().getHomeDescription()</span>
+<span class="nc" id="L49">                : &quot;null&quot;;</span>
+    }
+
+    @Bean(name = &quot;navBarText&quot;)
+    public String navBarText() {
+        String defaultNavBar =
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                applicationProperties.getUi().getAppNameNavbar() != null</span>
+<span class="nc" id="L56">                        ? applicationProperties.getUi().getAppNameNavbar()</span>
+<span class="nc" id="L57">                        : applicationProperties.getUi().getAppName();</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        return (defaultNavBar != null) ? defaultNavBar : &quot;Stirling PDF&quot;;</span>
+    }
+
+    @Bean(name = &quot;enableAlphaFunctionality&quot;)
+    public boolean enableAlphaFunctionality() {
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        return applicationProperties.getSystem().getEnableAlphaFunctionality() != null</span>
+<span class="nc" id="L64">                ? applicationProperties.getSystem().getEnableAlphaFunctionality()</span>
+<span class="nc" id="L65">                : false;</span>
+    }
+
+    @Bean(name = &quot;rateLimit&quot;)
+    public boolean rateLimit() {
+<span class="nc" id="L70">        String appName = System.getProperty(&quot;rateLimit&quot;);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (appName == null) appName = System.getenv(&quot;rateLimit&quot;);</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        return (appName != null) ? Boolean.valueOf(appName) : false;</span>
+    }
+
+    @Bean(name = &quot;RunningInDocker&quot;)
+    public boolean runningInDocker() {
+<span class="nc" id="L77">        return Files.exists(Paths.get(&quot;/.dockerenv&quot;));</span>
+    }
+
+    @Bean(name = &quot;bookAndHtmlFormatsInstalled&quot;)
+    public boolean bookAndHtmlFormatsInstalled() {
+<span class="nc" id="L82">        String installOps = System.getProperty(&quot;INSTALL_BOOK_AND_ADVANCED_HTML_OPS&quot;);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (installOps == null) {</span>
+<span class="nc" id="L84">            installOps = System.getenv(&quot;INSTALL_BOOK_AND_ADVANCED_HTML_OPS&quot;);</span>
+        }
+<span class="nc" id="L86">        return &quot;true&quot;.equalsIgnoreCase(installOps);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

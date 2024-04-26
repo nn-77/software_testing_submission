@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExtractImageScansController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api.misc</a> &gt; <span class="el_source">ExtractImageScansController.java</span></div><h1>ExtractImageScansController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api.misc;
+
+import java.awt.image.BufferedImage;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+import javax.imageio.ImageIO;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.PDFRenderer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.misc.ExtractImageScansRequest;
+import stirling.software.SPDF.utils.ProcessExecutor;
+import stirling.software.SPDF.utils.ProcessExecutor.ProcessExecutorResult;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/misc&quot;)
+@Tag(name = &quot;Misc&quot;, description = &quot;Miscellaneous APIs&quot;)
+<span class="nc" id="L43">public class ExtractImageScansController {</span>
+
+<span class="nc" id="L45">    private static final Logger logger = LoggerFactory.getLogger(ExtractImageScansController.class);</span>
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/extract-image-scans&quot;)
+    @Operation(
+            summary = &quot;Extract image scans from an input file&quot;,
+            description =
+                    &quot;This endpoint extracts image scans from a given file based on certain parameters. Users can specify angle threshold, tolerance, minimum area, minimum contour area, and border size. Input:PDF Output:IMAGE/ZIP Type:SIMO&quot;)
+    public ResponseEntity&lt;byte[]&gt; extractImageScans(
+            @RequestBody(
+                            description = &quot;Form data containing file and extraction parameters&quot;,
+                            required = true,
+                            content =
+                                    @Content(
+                                            mediaType = &quot;multipart/form-data&quot;,
+                                            schema =
+                                                    @Schema(
+                                                            implementation =
+                                                                    ExtractImageScansRequest
+                                                                            .class) // This should
+                                            // represent
+                                            // your form's
+                                            // structure
+                                            ))
+                    ExtractImageScansRequest form)
+            throws IOException, InterruptedException {
+<span class="nc" id="L70">        String fileName = form.getFileInput().getOriginalFilename();</span>
+<span class="nc" id="L71">        String extension = fileName.substring(fileName.lastIndexOf(&quot;.&quot;) + 1);</span>
+
+<span class="nc" id="L73">        List&lt;String&gt; images = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L75">        List&lt;Path&gt; tempImageFiles = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L76">        Path tempInputFile = null;</span>
+<span class="nc" id="L77">        Path tempZipFile = null;</span>
+<span class="nc" id="L78">        List&lt;Path&gt; tempDirs = new ArrayList&lt;&gt;();</span>
+
+        try {
+            // Check if input file is a PDF
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (&quot;pdf&quot;.equalsIgnoreCase(extension)) {</span>
+                // Load PDF document
+<span class="nc" id="L84">                try (PDDocument document = Loader.loadPDF(form.getFileInput().getBytes())) {</span>
+<span class="nc" id="L85">                    PDFRenderer pdfRenderer = new PDFRenderer(document);</span>
+<span class="nc" id="L86">                    pdfRenderer.setSubsamplingAllowed(true);</span>
+<span class="nc" id="L87">                    int pageCount = document.getNumberOfPages();</span>
+<span class="nc" id="L88">                    images = new ArrayList&lt;&gt;();</span>
+
+                    // Create images of all pages
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                    for (int i = 0; i &lt; pageCount; i++) {</span>
+                        // Create temp file to save the image
+<span class="nc" id="L93">                        Path tempFile = Files.createTempFile(&quot;image_&quot;, &quot;.png&quot;);</span>
+
+                        // Render image and save as temp file
+<span class="nc" id="L96">                        BufferedImage image = pdfRenderer.renderImageWithDPI(i, 300);</span>
+<span class="nc" id="L97">                        ImageIO.write(image, &quot;png&quot;, tempFile.toFile());</span>
+
+                        // Add temp file path to images list
+<span class="nc" id="L100">                        images.add(tempFile.toString());</span>
+<span class="nc" id="L101">                        tempImageFiles.add(tempFile);</span>
+                    }
+                }
+            } else {
+<span class="nc" id="L105">                tempInputFile = Files.createTempFile(&quot;input_&quot;, &quot;.&quot; + extension);</span>
+<span class="nc" id="L106">                Files.copy(</span>
+<span class="nc" id="L107">                        form.getFileInput().getInputStream(),</span>
+                        tempInputFile,
+                        StandardCopyOption.REPLACE_EXISTING);
+                // Add input file path to images list
+<span class="nc" id="L111">                images.add(tempInputFile.toString());</span>
+            }
+
+<span class="nc" id="L114">            List&lt;byte[]&gt; processedImageBytes = new ArrayList&lt;&gt;();</span>
+
+            // Process each image
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            for (int i = 0; i &lt; images.size(); i++) {</span>
+
+<span class="nc" id="L119">                Path tempDir = Files.createTempDirectory(&quot;openCV_output&quot;);</span>
+<span class="nc" id="L120">                tempDirs.add(tempDir);</span>
+<span class="nc" id="L121">                List&lt;String&gt; command =</span>
+                        new ArrayList&lt;&gt;(
+<span class="nc" id="L123">                                Arrays.asList(</span>
+                                        &quot;python3&quot;,
+                                        &quot;./scripts/split_photos.py&quot;,
+<span class="nc" id="L126">                                        images.get(i),</span>
+<span class="nc" id="L127">                                        tempDir.toString(),</span>
+                                        &quot;--angle_threshold&quot;,
+<span class="nc" id="L129">                                        String.valueOf(form.getAngleThreshold()),</span>
+                                        &quot;--tolerance&quot;,
+<span class="nc" id="L131">                                        String.valueOf(form.getTolerance()),</span>
+                                        &quot;--min_area&quot;,
+<span class="nc" id="L133">                                        String.valueOf(form.getMinArea()),</span>
+                                        &quot;--min_contour_area&quot;,
+<span class="nc" id="L135">                                        String.valueOf(form.getMinContourArea()),</span>
+                                        &quot;--border_size&quot;,
+<span class="nc" id="L137">                                        String.valueOf(form.getBorderSize())));</span>
+
+                // Run CLI command
+<span class="nc" id="L140">                ProcessExecutorResult returnCode =</span>
+<span class="nc" id="L141">                        ProcessExecutor.getInstance(ProcessExecutor.Processes.PYTHON_OPENCV)</span>
+<span class="nc" id="L142">                                .runCommandWithOutputHandling(command);</span>
+
+                // Read the output photos in temp directory
+<span class="nc" id="L145">                List&lt;Path&gt; tempOutputFiles = Files.list(tempDir).sorted().toList();</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                for (Path tempOutputFile : tempOutputFiles) {</span>
+<span class="nc" id="L147">                    byte[] imageBytes = Files.readAllBytes(tempOutputFile);</span>
+<span class="nc" id="L148">                    processedImageBytes.add(imageBytes);</span>
+<span class="nc" id="L149">                }</span>
+                // Clean up the temporary directory
+<span class="nc" id="L151">                FileUtils.deleteDirectory(tempDir.toFile());</span>
+            }
+
+            // Create zip file if multiple images
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (processedImageBytes.size() &gt; 1) {</span>
+<span class="nc" id="L156">                String outputZipFilename =</span>
+<span class="nc" id="L157">                        fileName.replaceFirst(REPLACEFIRST, &quot;&quot;) + &quot;_processed.zip&quot;;</span>
+<span class="nc" id="L158">                tempZipFile = Files.createTempFile(&quot;output_&quot;, &quot;.zip&quot;);</span>
+
+<span class="nc" id="L160">                try (ZipOutputStream zipOut =</span>
+<span class="nc" id="L161">                        new ZipOutputStream(new FileOutputStream(tempZipFile.toFile()))) {</span>
+                    // Add processed images to the zip
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                    for (int i = 0; i &lt; processedImageBytes.size(); i++) {</span>
+<span class="nc" id="L164">                        ZipEntry entry =</span>
+                                new ZipEntry(
+<span class="nc" id="L166">                                        fileName.replaceFirst(REPLACEFIRST, &quot;&quot;)</span>
+                                                + &quot;_&quot;
+                                                + (i + 1)
+                                                + &quot;.png&quot;);
+<span class="nc" id="L170">                        zipOut.putNextEntry(entry);</span>
+<span class="nc" id="L171">                        zipOut.write(processedImageBytes.get(i));</span>
+<span class="nc" id="L172">                        zipOut.closeEntry();</span>
+                    }
+                }
+
+<span class="nc" id="L176">                byte[] zipBytes = Files.readAllBytes(tempZipFile);</span>
+
+                // Clean up the temporary zip file
+<span class="nc" id="L179">                Files.delete(tempZipFile);</span>
+
+<span class="nc" id="L181">                return WebResponseUtils.bytesToWebResponse(</span>
+                        zipBytes, outputZipFilename, MediaType.APPLICATION_OCTET_STREAM);
+            } else {
+                // Return the processed image as a response
+<span class="nc" id="L185">                byte[] imageBytes = processedImageBytes.get(0);</span>
+<span class="nc" id="L186">                return WebResponseUtils.bytesToWebResponse(</span>
+                        imageBytes,
+<span class="nc" id="L188">                        fileName.replaceFirst(REPLACEFIRST, &quot;&quot;) + &quot;.png&quot;,</span>
+                        MediaType.IMAGE_PNG);
+            }
+        } finally {
+            // Cleanup logic for all temporary files and directories
+<span class="nc" id="L193">            tempImageFiles.forEach(</span>
+                    path -&gt; {
+                        try {
+<span class="nc" id="L196">                            Files.deleteIfExists(path);</span>
+<span class="nc" id="L197">                        } catch (IOException e) {</span>
+<span class="nc" id="L198">                            logger.error(&quot;Failed to delete temporary image file: &quot; + path, e);</span>
+<span class="nc" id="L199">                        }</span>
+<span class="nc" id="L200">                    });</span>
+
+<span class="nc bnc" id="L202" title="All 4 branches missed.">            if (tempZipFile != null &amp;&amp; Files.exists(tempZipFile)) {</span>
+                try {
+<span class="nc" id="L204">                    Files.delete(tempZipFile);</span>
+<span class="nc" id="L205">                } catch (IOException e) {</span>
+<span class="nc" id="L206">                    logger.error(&quot;Failed to delete temporary zip file: &quot; + tempZipFile, e);</span>
+<span class="nc" id="L207">                }</span>
+            }
+
+<span class="nc" id="L210">            tempDirs.forEach(</span>
+                    dir -&gt; {
+                        try {
+<span class="nc" id="L213">                            FileUtils.deleteDirectory(dir.toFile());</span>
+<span class="nc" id="L214">                        } catch (IOException e) {</span>
+<span class="nc" id="L215">                            logger.error(&quot;Failed to delete temporary directory: &quot; + dir, e);</span>
+<span class="nc" id="L216">                        }</span>
+<span class="nc" id="L217">                    });</span>
+        }
+    }
+
+    private static final String REPLACEFIRST = &quot;[.][^.]+$&quot;;
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

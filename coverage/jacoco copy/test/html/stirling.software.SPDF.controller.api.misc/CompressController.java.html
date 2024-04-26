@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CompressController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api.misc</a> &gt; <span class="el_source">CompressController.java</span></div><h1>CompressController.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api.misc;
+
+import java.awt.Image;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.imageio.ImageIO;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.github.pixee.security.Filenames;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.misc.OptimizePdfRequest;
+import stirling.software.SPDF.utils.GeneralUtils;
+import stirling.software.SPDF.utils.ProcessExecutor;
+import stirling.software.SPDF.utils.ProcessExecutor.ProcessExecutorResult;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/misc&quot;)
+@Tag(name = &quot;Misc&quot;, description = &quot;Miscellaneous APIs&quot;)
+<span class="nc" id="L43">public class CompressController {</span>
+
+<span class="nc" id="L45">    private static final Logger logger = LoggerFactory.getLogger(CompressController.class);</span>
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/compress-pdf&quot;)
+    @Operation(
+            summary = &quot;Optimize PDF file&quot;,
+            description =
+                    &quot;This endpoint accepts a PDF file and optimizes it based on the provided parameters. Input:PDF Output:PDF Type:SISO&quot;)
+    public ResponseEntity&lt;byte[]&gt; optimizePdf(@ModelAttribute OptimizePdfRequest request)
+            throws Exception {
+<span class="nc" id="L54">        MultipartFile inputFile = request.getFileInput();</span>
+<span class="nc" id="L55">        Integer optimizeLevel = request.getOptimizeLevel();</span>
+<span class="nc" id="L56">        String expectedOutputSizeString = request.getExpectedOutputSize();</span>
+
+<span class="nc bnc" id="L58" title="All 4 branches missed.">        if (expectedOutputSizeString == null &amp;&amp; optimizeLevel == null) {</span>
+<span class="nc" id="L59">            throw new Exception(&quot;Both expected output size and optimize level are not specified&quot;);</span>
+        }
+
+<span class="nc" id="L62">        Long expectedOutputSize = 0L;</span>
+<span class="nc" id="L63">        boolean autoMode = false;</span>
+<span class="nc bnc" id="L64" title="All 4 branches missed.">        if (expectedOutputSizeString != null &amp;&amp; expectedOutputSizeString.length() &gt; 1) {</span>
+<span class="nc" id="L65">            expectedOutputSize = GeneralUtils.convertSizeToBytes(expectedOutputSizeString);</span>
+<span class="nc" id="L66">            autoMode = true;</span>
+        }
+
+        // Save the uploaded file to a temporary location
+<span class="nc" id="L70">        Path tempInputFile = Files.createTempFile(&quot;input_&quot;, &quot;.pdf&quot;);</span>
+<span class="nc" id="L71">        inputFile.transferTo(tempInputFile.toFile());</span>
+
+<span class="nc" id="L73">        long inputFileSize = Files.size(tempInputFile);</span>
+
+        // Prepare the output file path
+
+<span class="nc" id="L77">        Path tempOutputFile = null;</span>
+        byte[] pdfBytes;
+        try {
+<span class="nc" id="L80">            tempOutputFile = Files.createTempFile(&quot;output_&quot;, &quot;.pdf&quot;);</span>
+            // Determine initial optimization level based on expected size reduction, only if in
+            // autoMode
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            if (autoMode) {</span>
+<span class="nc" id="L84">                double sizeReductionRatio = expectedOutputSize / (double) inputFileSize;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                if (sizeReductionRatio &gt; 0.7) {</span>
+<span class="nc" id="L86">                    optimizeLevel = 1;</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                } else if (sizeReductionRatio &gt; 0.5) {</span>
+<span class="nc" id="L88">                    optimizeLevel = 2;</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                } else if (sizeReductionRatio &gt; 0.35) {</span>
+<span class="nc" id="L90">                    optimizeLevel = 3;</span>
+                } else {
+<span class="nc" id="L92">                    optimizeLevel = 3;</span>
+                }
+            }
+
+<span class="nc" id="L96">            boolean sizeMet = false;</span>
+<span class="nc bnc" id="L97" title="All 4 branches missed.">            while (!sizeMet &amp;&amp; optimizeLevel &lt;= 4) {</span>
+                // Prepare the Ghostscript command
+<span class="nc" id="L99">                List&lt;String&gt; command = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L100">                command.add(&quot;gs&quot;);</span>
+<span class="nc" id="L101">                command.add(&quot;-sDEVICE=pdfwrite&quot;);</span>
+<span class="nc" id="L102">                command.add(&quot;-dCompatibilityLevel=1.4&quot;);</span>
+
+<span class="nc bnc" id="L104" title="All 5 branches missed.">                switch (optimizeLevel) {</span>
+                    case 1:
+<span class="nc" id="L106">                        command.add(&quot;-dPDFSETTINGS=/prepress&quot;);</span>
+<span class="nc" id="L107">                        break;</span>
+                    case 2:
+<span class="nc" id="L109">                        command.add(&quot;-dPDFSETTINGS=/printer&quot;);</span>
+<span class="nc" id="L110">                        break;</span>
+                    case 3:
+<span class="nc" id="L112">                        command.add(&quot;-dPDFSETTINGS=/ebook&quot;);</span>
+<span class="nc" id="L113">                        break;</span>
+                    case 4:
+<span class="nc" id="L115">                        command.add(&quot;-dPDFSETTINGS=/screen&quot;);</span>
+<span class="nc" id="L116">                        break;</span>
+                    default:
+<span class="nc" id="L118">                        command.add(&quot;-dPDFSETTINGS=/default&quot;);</span>
+                }
+
+<span class="nc" id="L121">                command.add(&quot;-dNOPAUSE&quot;);</span>
+<span class="nc" id="L122">                command.add(&quot;-dQUIET&quot;);</span>
+<span class="nc" id="L123">                command.add(&quot;-dBATCH&quot;);</span>
+<span class="nc" id="L124">                command.add(&quot;-sOutputFile=&quot; + tempOutputFile.toString());</span>
+<span class="nc" id="L125">                command.add(tempInputFile.toString());</span>
+
+<span class="nc" id="L127">                ProcessExecutorResult returnCode =</span>
+<span class="nc" id="L128">                        ProcessExecutor.getInstance(ProcessExecutor.Processes.GHOSTSCRIPT)</span>
+<span class="nc" id="L129">                                .runCommandWithOutputHandling(command);</span>
+
+                // Check if file size is within expected size or not auto mode so instantly finish
+<span class="nc" id="L132">                long outputFileSize = Files.size(tempOutputFile);</span>
+<span class="nc bnc" id="L133" title="All 4 branches missed.">                if (outputFileSize &lt;= expectedOutputSize || !autoMode) {</span>
+<span class="nc" id="L134">                    sizeMet = true;</span>
+                } else {
+                    // Increase optimization level for next iteration
+<span class="nc" id="L137">                    optimizeLevel++;</span>
+<span class="nc bnc" id="L138" title="All 4 branches missed.">                    if (autoMode &amp;&amp; optimizeLevel &gt; 4) {</span>
+<span class="nc" id="L139">                        System.out.println(&quot;Skipping level 5 due to bad results in auto mode&quot;);</span>
+<span class="nc" id="L140">                        sizeMet = true;</span>
+                    } else {
+<span class="nc" id="L142">                        System.out.println(</span>
+                                &quot;Increasing ghostscript optimisation level to &quot; + optimizeLevel);
+                    }
+                }
+<span class="nc" id="L146">            }</span>
+
+<span class="nc bnc" id="L148" title="All 4 branches missed.">            if (expectedOutputSize != null &amp;&amp; autoMode) {</span>
+<span class="nc" id="L149">                long outputFileSize = Files.size(tempOutputFile);</span>
+<span class="nc" id="L150">                byte[] fileBytes = Files.readAllBytes(tempOutputFile);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                if (outputFileSize &gt; expectedOutputSize) {</span>
+<span class="nc" id="L152">                    try (PDDocument doc = Loader.loadPDF(fileBytes)) {</span>
+<span class="nc" id="L153">                        long previousFileSize = 0;</span>
+<span class="nc" id="L154">                        double scaleFactorConst = 0.9f;</span>
+<span class="nc" id="L155">                        double scaleFactor = 0.9f;</span>
+                        while (true) {
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                            for (PDPage page : doc.getPages()) {</span>
+<span class="nc" id="L158">                                PDResources res = page.getResources();</span>
+<span class="nc bnc" id="L159" title="All 4 branches missed.">                                if (res != null &amp;&amp; res.getXObjectNames() != null) {</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                                    for (COSName name : res.getXObjectNames()) {</span>
+<span class="nc" id="L161">                                        PDXObject xobj = res.getXObject(name);</span>
+<span class="nc bnc" id="L162" title="All 4 branches missed.">                                        if (xobj != null &amp;&amp; xobj instanceof PDImageXObject) {</span>
+<span class="nc" id="L163">                                            PDImageXObject image = (PDImageXObject) xobj;</span>
+
+                                            // Get the image in BufferedImage format
+<span class="nc" id="L166">                                            BufferedImage bufferedImage = image.getImage();</span>
+
+                                            // Calculate the new dimensions
+<span class="nc" id="L169">                                            int newWidth =</span>
+                                                    (int)
+<span class="nc" id="L171">                                                            (bufferedImage.getWidth()</span>
+                                                                    * scaleFactorConst);
+<span class="nc" id="L173">                                            int newHeight =</span>
+                                                    (int)
+<span class="nc" id="L175">                                                            (bufferedImage.getHeight()</span>
+                                                                    * scaleFactorConst);
+
+                                            // If the new dimensions are zero, skip this iteration
+<span class="nc bnc" id="L179" title="All 4 branches missed.">                                            if (newWidth == 0 || newHeight == 0) {</span>
+<span class="nc" id="L180">                                                continue;</span>
+                                            }
+
+                                            // Otherwise, proceed with the scaling
+<span class="nc" id="L184">                                            Image scaledImage =</span>
+<span class="nc" id="L185">                                                    bufferedImage.getScaledInstance(</span>
+                                                            newWidth,
+                                                            newHeight,
+                                                            Image.SCALE_SMOOTH);
+
+                                            // Convert the scaled image back to a BufferedImage
+<span class="nc" id="L191">                                            BufferedImage scaledBufferedImage =</span>
+                                                    new BufferedImage(
+                                                            newWidth,
+                                                            newHeight,
+                                                            BufferedImage.TYPE_INT_RGB);
+<span class="nc" id="L196">                                            scaledBufferedImage</span>
+<span class="nc" id="L197">                                                    .getGraphics()</span>
+<span class="nc" id="L198">                                                    .drawImage(scaledImage, 0, 0, null);</span>
+
+                                            // Compress the scaled image
+<span class="nc" id="L201">                                            ByteArrayOutputStream compressedImageStream =</span>
+                                                    new ByteArrayOutputStream();
+<span class="nc" id="L203">                                            ImageIO.write(</span>
+                                                    scaledBufferedImage,
+                                                    &quot;jpeg&quot;,
+                                                    compressedImageStream);
+<span class="nc" id="L207">                                            byte[] imageBytes = compressedImageStream.toByteArray();</span>
+<span class="nc" id="L208">                                            compressedImageStream.close();</span>
+
+<span class="nc" id="L210">                                            PDImageXObject compressedImage =</span>
+<span class="nc" id="L211">                                                    PDImageXObject.createFromByteArray(</span>
+                                                            doc,
+                                                            imageBytes,
+<span class="nc" id="L214">                                                            image.getCOSObject().toString());</span>
+
+                                            // Replace the image in the resources with the
+                                            // compressed
+                                            // version
+<span class="nc" id="L219">                                            res.put(name, compressedImage);</span>
+                                        }
+<span class="nc" id="L221">                                    }</span>
+                                }
+<span class="nc" id="L223">                            }</span>
+
+                            // save the document to tempOutputFile again
+<span class="nc" id="L226">                            doc.save(tempOutputFile.toString());</span>
+
+<span class="nc" id="L228">                            long currentSize = Files.size(tempOutputFile);</span>
+                            // Check if the overall PDF size is still larger than expectedOutputSize
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                            if (currentSize &gt; expectedOutputSize) {</span>
+                                // Log the current file size and scaleFactor
+
+<span class="nc" id="L233">                                System.out.println(</span>
+                                        &quot;Current file size: &quot;
+<span class="nc" id="L235">                                                + FileUtils.byteCountToDisplaySize(currentSize));</span>
+<span class="nc" id="L236">                                System.out.println(&quot;Current scale factor: &quot; + scaleFactor);</span>
+
+                                // The file is still too large, reduce scaleFactor and try again
+<span class="nc" id="L239">                                scaleFactor *= 0.9f; // reduce scaleFactor by 10%</span>
+                                // Avoid scaleFactor being too small, causing the image to shrink to
+                                // 0
+<span class="nc bnc" id="L242" title="All 4 branches missed.">                                if (scaleFactor &lt; 0.2f || previousFileSize == currentSize) {</span>
+<span class="nc" id="L243">                                    throw new RuntimeException(</span>
+                                            &quot;Could not reach the desired size without excessively degrading image quality, lowest size recommended is &quot;
+<span class="nc" id="L245">                                                    + FileUtils.byteCountToDisplaySize(currentSize)</span>
+                                                    + &quot;, &quot;
+                                                    + currentSize
+                                                    + &quot; bytes&quot;);
+                                }
+<span class="nc" id="L250">                                previousFileSize = currentSize;</span>
+                            } else {
+                                // The file is small enough, break the loop
+                                break;
+                            }
+<span class="nc" id="L255">                        }</span>
+                    }
+                }
+            }
+
+            // Read the optimized PDF file
+<span class="nc" id="L261">            pdfBytes = Files.readAllBytes(tempOutputFile);</span>
+
+            // Check if optimized file is larger than the original
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (pdfBytes.length &gt; inputFileSize) {</span>
+                // Log the occurrence
+<span class="nc" id="L266">                logger.warn(</span>
+                        &quot;Optimized file is larger than the original. Returning the original file instead.&quot;);
+
+                // Read the original file again
+<span class="nc" id="L270">                pdfBytes = Files.readAllBytes(tempInputFile);</span>
+            }
+        } finally {
+            // Clean up the temporary files
+<span class="nc" id="L274">            Files.delete(tempInputFile);</span>
+<span class="nc" id="L275">            Files.delete(tempOutputFile);</span>
+        }
+
+        // Return the optimized PDF as a response
+<span class="nc" id="L279">        String outputFilename =</span>
+<span class="nc" id="L280">                Filenames.toSimpleFileName(inputFile.getOriginalFilename())</span>
+<span class="nc" id="L281">                                .replaceFirst(&quot;[.][^.]+$&quot;, &quot;&quot;)</span>
+                        + &quot;_Optimized.pdf&quot;;
+<span class="nc" id="L283">        return WebResponseUtils.bytesToWebResponse(pdfBytes, outputFilename);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

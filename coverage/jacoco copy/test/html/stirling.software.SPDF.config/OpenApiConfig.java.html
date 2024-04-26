@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenApiConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.config</a> &gt; <span class="el_source">OpenApiConfig.java</span></div><h1>OpenApiConfig.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+
+import stirling.software.SPDF.model.ApplicationProperties;
+
+@Configuration
+<span class="nc" id="L16">public class OpenApiConfig {</span>
+
+    @Autowired ApplicationProperties applicationProperties;
+
+    @Bean
+    public OpenAPI customOpenAPI() {
+<span class="nc" id="L22">        String version = getClass().getPackage().getImplementationVersion();</span>
+<span class="nc bnc" id="L23" title="All 2 branches missed.">        if (version == null) {</span>
+<span class="nc" id="L24">            version = &quot;1.0.0&quot;; // default version if all else fails</span>
+        }
+
+<span class="nc" id="L27">        SecurityScheme apiKeyScheme =</span>
+                new SecurityScheme()
+<span class="nc" id="L29">                        .type(SecurityScheme.Type.APIKEY)</span>
+<span class="nc" id="L30">                        .in(SecurityScheme.In.HEADER)</span>
+<span class="nc" id="L31">                        .name(&quot;X-API-KEY&quot;);</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        if (!applicationProperties.getSecurity().getEnableLogin()) {</span>
+<span class="nc" id="L33">            return new OpenAPI()</span>
+<span class="nc" id="L34">                    .components(new Components())</span>
+<span class="nc" id="L35">                    .info(</span>
+                            new Info()
+<span class="nc" id="L37">                                    .title(&quot;Stirling PDF API&quot;)</span>
+<span class="nc" id="L38">                                    .version(version)</span>
+<span class="nc" id="L39">                                    .description(</span>
+                                            &quot;API documentation for all Server-Side processing.\nPlease note some functionality might be UI only and missing from here.&quot;));
+        } else {
+<span class="nc" id="L42">            return new OpenAPI()</span>
+<span class="nc" id="L43">                    .components(new Components().addSecuritySchemes(&quot;apiKey&quot;, apiKeyScheme))</span>
+<span class="nc" id="L44">                    .info(</span>
+                            new Info()
+<span class="nc" id="L46">                                    .title(&quot;Stirling PDF API&quot;)</span>
+<span class="nc" id="L47">                                    .version(version)</span>
+<span class="nc" id="L48">                                    .description(</span>
+                                            &quot;API documentation for all Server-Side processing.\nPlease note some functionality might be UI only and missing from here.&quot;))
+<span class="nc" id="L50">                    .addSecurityItem(new SecurityRequirement().addList(&quot;apiKey&quot;));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

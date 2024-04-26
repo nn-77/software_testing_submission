@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PDFText.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.model</a> &gt; <span class="el_source">PDFText.java</span></div><h1>PDFText.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.model;
+
+public class PDFText {
+    private final int pageIndex;
+    private final float x1;
+    private final float y1;
+    private final float x2;
+    private final float y2;
+    private final String text;
+
+<span class="nc" id="L11">    public PDFText(int pageIndex, float x1, float y1, float x2, float y2, String text) {</span>
+<span class="nc" id="L12">        this.pageIndex = pageIndex;</span>
+<span class="nc" id="L13">        this.x1 = x1;</span>
+<span class="nc" id="L14">        this.y1 = y1;</span>
+<span class="nc" id="L15">        this.x2 = x2;</span>
+<span class="nc" id="L16">        this.y2 = y2;</span>
+<span class="nc" id="L17">        this.text = text;</span>
+<span class="nc" id="L18">    }</span>
+
+    public int getPageIndex() {
+<span class="nc" id="L21">        return pageIndex;</span>
+    }
+
+    public float getX1() {
+<span class="nc" id="L25">        return x1;</span>
+    }
+
+    public float getY1() {
+<span class="nc" id="L29">        return y1;</span>
+    }
+
+    public float getX2() {
+<span class="nc" id="L33">        return x2;</span>
+    }
+
+    public float getY2() {
+<span class="nc" id="L37">        return y2;</span>
+    }
+
+    public String getText() {
+<span class="nc" id="L41">        return text;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

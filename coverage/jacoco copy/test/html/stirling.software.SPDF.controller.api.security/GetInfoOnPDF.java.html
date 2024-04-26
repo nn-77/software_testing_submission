@@ -1,0 +1,756 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GetInfoOnPDF.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Stirling-PDF</a> &gt; <a href="index.source.html" class="el_package">stirling.software.SPDF.controller.api.security</a> &gt; <span class="el_source">GetInfoOnPDF.java</span></div><h1>GetInfoOnPDF.java</h1><pre class="source lang-java linenums">package stirling.software.SPDF.controller.api.security;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.cos.COSInputStream;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.cos.COSString;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDDocumentCatalog;
+import org.apache.pdfbox.pdmodel.PDDocumentInformation;
+import org.apache.pdfbox.pdmodel.PDDocumentNameDictionary;
+import org.apache.pdfbox.pdmodel.PDEmbeddedFilesNameTreeNode;
+import org.apache.pdfbox.pdmodel.PDJavascriptNameTreeNode;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.common.PDMetadata;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.common.PDStream;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDComplexFileSpecification;
+import org.apache.pdfbox.pdmodel.common.filespecification.PDEmbeddedFile;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureElement;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureNode;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureTreeRoot;
+import org.apache.pdfbox.pdmodel.encryption.AccessPermission;
+import org.apache.pdfbox.pdmodel.encryption.PDEncryption;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDFontDescriptor;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.color.PDColorSpace;
+import org.apache.pdfbox.pdmodel.graphics.color.PDICCBased;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.pdmodel.graphics.optionalcontent.PDOptionalContentGroup;
+import org.apache.pdfbox.pdmodel.graphics.optionalcontent.PDOptionalContentProperties;
+import org.apache.pdfbox.pdmodel.interactive.action.PDActionJavaScript;
+import org.apache.pdfbox.pdmodel.interactive.action.PDActionURI;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotation;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationFileAttachment;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink;
+import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
+import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineNode;
+import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
+import org.apache.pdfbox.pdmodel.interactive.form.PDField;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.xmpbox.XMPMetadata;
+import org.apache.xmpbox.xml.DomXmpParser;
+import org.apache.xmpbox.xml.XmpParsingException;
+import org.apache.xmpbox.xml.XmpSerializer;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+import stirling.software.SPDF.model.api.PDFFile;
+import stirling.software.SPDF.utils.WebResponseUtils;
+
+@RestController
+@RequestMapping(&quot;/api/v1/security&quot;)
+@Tag(name = &quot;Security&quot;, description = &quot;Security APIs&quot;)
+<span class="nc" id="L80">public class GetInfoOnPDF {</span>
+
+<span class="nc" id="L82">    static ObjectMapper objectMapper = new ObjectMapper();</span>
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;, value = &quot;/get-info-on-pdf&quot;)
+    @Operation(summary = &quot;Summary here&quot;, description = &quot;desc. Input:PDF Output:JSON Type:SISO&quot;)
+    public ResponseEntity&lt;byte[]&gt; getPdfInfo(@ModelAttribute PDFFile request) throws IOException {
+<span class="nc" id="L87">        MultipartFile inputFile = request.getFileInput();</span>
+<span class="nc" id="L88">        try (PDDocument pdfBoxDoc = Loader.loadPDF(inputFile.getBytes()); ) {</span>
+<span class="nc" id="L89">            ObjectMapper objectMapper = new ObjectMapper();</span>
+<span class="nc" id="L90">            ObjectNode jsonOutput = objectMapper.createObjectNode();</span>
+
+            // Metadata using PDFBox
+<span class="nc" id="L93">            PDDocumentInformation info = pdfBoxDoc.getDocumentInformation();</span>
+<span class="nc" id="L94">            ObjectNode metadata = objectMapper.createObjectNode();</span>
+<span class="nc" id="L95">            ObjectNode basicInfo = objectMapper.createObjectNode();</span>
+<span class="nc" id="L96">            ObjectNode docInfoNode = objectMapper.createObjectNode();</span>
+<span class="nc" id="L97">            ObjectNode compliancy = objectMapper.createObjectNode();</span>
+<span class="nc" id="L98">            ObjectNode encryption = objectMapper.createObjectNode();</span>
+<span class="nc" id="L99">            ObjectNode other = objectMapper.createObjectNode();</span>
+
+<span class="nc" id="L101">            metadata.put(&quot;Title&quot;, info.getTitle());</span>
+<span class="nc" id="L102">            metadata.put(&quot;Author&quot;, info.getAuthor());</span>
+<span class="nc" id="L103">            metadata.put(&quot;Subject&quot;, info.getSubject());</span>
+<span class="nc" id="L104">            metadata.put(&quot;Keywords&quot;, info.getKeywords());</span>
+<span class="nc" id="L105">            metadata.put(&quot;Producer&quot;, info.getProducer());</span>
+<span class="nc" id="L106">            metadata.put(&quot;Creator&quot;, info.getCreator());</span>
+<span class="nc" id="L107">            metadata.put(&quot;CreationDate&quot;, formatDate(info.getCreationDate()));</span>
+<span class="nc" id="L108">            metadata.put(&quot;ModificationDate&quot;, formatDate(info.getModificationDate()));</span>
+<span class="nc" id="L109">            jsonOutput.set(&quot;Metadata&quot;, metadata);</span>
+
+            // Total file size of the PDF
+<span class="nc" id="L112">            long fileSizeInBytes = inputFile.getSize();</span>
+<span class="nc" id="L113">            basicInfo.put(&quot;FileSizeInBytes&quot;, fileSizeInBytes);</span>
+
+            // Number of words, paragraphs, and images in the entire document
+<span class="nc" id="L116">            String fullText = new PDFTextStripper().getText(pdfBoxDoc);</span>
+<span class="nc" id="L117">            String[] words = fullText.split(&quot;\\s+&quot;);</span>
+<span class="nc" id="L118">            int wordCount = words.length;</span>
+<span class="nc" id="L119">            int paragraphCount = fullText.split(&quot;\r\n|\r|\n&quot;).length;</span>
+<span class="nc" id="L120">            basicInfo.put(&quot;WordCount&quot;, wordCount);</span>
+<span class="nc" id="L121">            basicInfo.put(&quot;ParagraphCount&quot;, paragraphCount);</span>
+            // Number of characters in the entire document (including spaces and special characters)
+<span class="nc" id="L123">            int charCount = fullText.length();</span>
+<span class="nc" id="L124">            basicInfo.put(&quot;CharacterCount&quot;, charCount);</span>
+
+            // Initialize the flags and types
+<span class="nc" id="L127">            boolean hasCompression = false;</span>
+<span class="nc" id="L128">            String compressionType = &quot;None&quot;;</span>
+
+<span class="nc" id="L130">            basicInfo.put(&quot;Compression&quot;, hasCompression);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (hasCompression) basicInfo.put(&quot;CompressionType&quot;, compressionType);</span>
+
+<span class="nc" id="L133">            String language = pdfBoxDoc.getDocumentCatalog().getLanguage();</span>
+<span class="nc" id="L134">            basicInfo.put(&quot;Language&quot;, language);</span>
+<span class="nc" id="L135">            basicInfo.put(&quot;Number of pages&quot;, pdfBoxDoc.getNumberOfPages());</span>
+
+<span class="nc" id="L137">            PDDocumentCatalog catalog = pdfBoxDoc.getDocumentCatalog();</span>
+<span class="nc" id="L138">            String pageMode = catalog.getPageMode().name();</span>
+
+            // Document Information using PDFBox
+<span class="nc" id="L141">            docInfoNode.put(&quot;PDF version&quot;, pdfBoxDoc.getVersion());</span>
+<span class="nc" id="L142">            docInfoNode.put(&quot;Trapped&quot;, info.getTrapped());</span>
+<span class="nc" id="L143">            docInfoNode.put(&quot;Page Mode&quot;, getPageModeDescription(pageMode));</span>
+            ;
+
+<span class="nc" id="L146">            PDAcroForm acroForm = pdfBoxDoc.getDocumentCatalog().getAcroForm();</span>
+
+<span class="nc" id="L148">            ObjectNode formFieldsNode = objectMapper.createObjectNode();</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (acroForm != null) {</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                for (PDField field : acroForm.getFieldTree()) {</span>
+<span class="nc" id="L151">                    formFieldsNode.put(field.getFullyQualifiedName(), field.getValueAsString());</span>
+<span class="nc" id="L152">                }</span>
+            }
+<span class="nc" id="L154">            jsonOutput.set(&quot;FormFields&quot;, formFieldsNode);</span>
+
+            // embeed files TODO size
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (catalog.getNames() != null) {</span>
+<span class="nc" id="L158">                PDEmbeddedFilesNameTreeNode efTree = catalog.getNames().getEmbeddedFiles();</span>
+
+<span class="nc" id="L160">                ArrayNode embeddedFilesArray = objectMapper.createArrayNode();</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                if (efTree != null) {</span>
+<span class="nc" id="L162">                    Map&lt;String, PDComplexFileSpecification&gt; efMap = efTree.getNames();</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                    if (efMap != null) {</span>
+                        for (Map.Entry&lt;String, PDComplexFileSpecification&gt; entry :
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                                efMap.entrySet()) {</span>
+<span class="nc" id="L166">                            ObjectNode embeddedFileNode = objectMapper.createObjectNode();</span>
+<span class="nc" id="L167">                            embeddedFileNode.put(&quot;Name&quot;, entry.getKey());</span>
+<span class="nc" id="L168">                            PDEmbeddedFile embeddedFile = entry.getValue().getEmbeddedFile();</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                            if (embeddedFile != null) {</span>
+<span class="nc" id="L170">                                embeddedFileNode.put(</span>
+<span class="nc" id="L171">                                        &quot;FileSize&quot;, embeddedFile.getLength()); // size in bytes</span>
+                            }
+<span class="nc" id="L173">                            embeddedFilesArray.add(embeddedFileNode);</span>
+<span class="nc" id="L174">                        }</span>
+                    }
+                }
+<span class="nc" id="L177">                other.set(&quot;EmbeddedFiles&quot;, embeddedFilesArray);</span>
+            }
+
+            // attachments TODO size
+<span class="nc" id="L181">            ArrayNode attachmentsArray = objectMapper.createArrayNode();</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            for (PDPage page : pdfBoxDoc.getPages()) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                for (PDAnnotation annotation : page.getAnnotations()) {</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                    if (annotation instanceof PDAnnotationFileAttachment) {</span>
+<span class="nc" id="L185">                        PDAnnotationFileAttachment fileAttachmentAnnotation =</span>
+                                (PDAnnotationFileAttachment) annotation;
+
+<span class="nc" id="L188">                        ObjectNode attachmentNode = objectMapper.createObjectNode();</span>
+<span class="nc" id="L189">                        attachmentNode.put(&quot;Name&quot;, fileAttachmentAnnotation.getAttachmentName());</span>
+<span class="nc" id="L190">                        attachmentNode.put(&quot;Description&quot;, fileAttachmentAnnotation.getContents());</span>
+
+<span class="nc" id="L192">                        attachmentsArray.add(attachmentNode);</span>
+                    }
+<span class="nc" id="L194">                }</span>
+<span class="nc" id="L195">            }</span>
+<span class="nc" id="L196">            other.set(&quot;Attachments&quot;, attachmentsArray);</span>
+
+            // Javascript
+<span class="nc" id="L199">            PDDocumentNameDictionary namesDict = catalog.getNames();</span>
+<span class="nc" id="L200">            ArrayNode javascriptArray = objectMapper.createArrayNode();</span>
+
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            if (namesDict != null) {</span>
+<span class="nc" id="L203">                PDJavascriptNameTreeNode javascriptDict = namesDict.getJavaScript();</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                if (javascriptDict != null) {</span>
+                    try {
+<span class="nc" id="L206">                        Map&lt;String, PDActionJavaScript&gt; jsEntries = javascriptDict.getNames();</span>
+
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                        for (Map.Entry&lt;String, PDActionJavaScript&gt; entry : jsEntries.entrySet()) {</span>
+<span class="nc" id="L209">                            ObjectNode jsNode = objectMapper.createObjectNode();</span>
+<span class="nc" id="L210">                            jsNode.put(&quot;JS Name&quot;, entry.getKey());</span>
+
+<span class="nc" id="L212">                            PDActionJavaScript jsAction = entry.getValue();</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                            if (jsAction != null) {</span>
+<span class="nc" id="L214">                                String jsCodeStr = jsAction.getAction();</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                                if (jsCodeStr != null) {</span>
+<span class="nc" id="L216">                                    jsNode.put(&quot;JS Script Length&quot;, jsCodeStr.length());</span>
+                                }
+                            }
+
+<span class="nc" id="L220">                            javascriptArray.add(jsNode);</span>
+<span class="nc" id="L221">                        }</span>
+<span class="nc" id="L222">                    } catch (IOException e) {</span>
+<span class="nc" id="L223">                        e.printStackTrace();</span>
+<span class="nc" id="L224">                    }</span>
+                }
+            }
+<span class="nc" id="L227">            other.set(&quot;JavaScript&quot;, javascriptArray);</span>
+
+            // TODO size
+<span class="nc" id="L230">            PDOptionalContentProperties ocProperties =</span>
+<span class="nc" id="L231">                    pdfBoxDoc.getDocumentCatalog().getOCProperties();</span>
+<span class="nc" id="L232">            ArrayNode layersArray = objectMapper.createArrayNode();</span>
+
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            if (ocProperties != null) {</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                for (PDOptionalContentGroup ocg : ocProperties.getOptionalContentGroups()) {</span>
+<span class="nc" id="L236">                    ObjectNode layerNode = objectMapper.createObjectNode();</span>
+<span class="nc" id="L237">                    layerNode.put(&quot;Name&quot;, ocg.getName());</span>
+<span class="nc" id="L238">                    layersArray.add(layerNode);</span>
+<span class="nc" id="L239">                }</span>
+            }
+
+<span class="nc" id="L242">            other.set(&quot;Layers&quot;, layersArray);</span>
+
+            // TODO Security
+
+<span class="nc" id="L246">            PDStructureTreeRoot structureTreeRoot =</span>
+<span class="nc" id="L247">                    pdfBoxDoc.getDocumentCatalog().getStructureTreeRoot();</span>
+            ArrayNode structureTreeArray;
+            try {
+<span class="nc bnc" id="L250" title="All 2 branches missed.">                if (structureTreeRoot != null) {</span>
+<span class="nc" id="L251">                    structureTreeArray = exploreStructureTree(structureTreeRoot.getKids());</span>
+<span class="nc" id="L252">                    other.set(&quot;StructureTree&quot;, structureTreeArray);</span>
+                }
+<span class="nc" id="L254">            } catch (Exception e) {</span>
+                // TODO Auto-generated catch block
+<span class="nc" id="L256">                e.printStackTrace();</span>
+<span class="nc" id="L257">            }</span>
+
+<span class="nc" id="L259">            boolean isPdfACompliant = checkForStandard(pdfBoxDoc, &quot;PDF/A&quot;);</span>
+<span class="nc" id="L260">            boolean isPdfXCompliant = checkForStandard(pdfBoxDoc, &quot;PDF/X&quot;);</span>
+<span class="nc" id="L261">            boolean isPdfECompliant = checkForStandard(pdfBoxDoc, &quot;PDF/E&quot;);</span>
+<span class="nc" id="L262">            boolean isPdfVTCompliant = checkForStandard(pdfBoxDoc, &quot;PDF/VT&quot;);</span>
+<span class="nc" id="L263">            boolean isPdfUACompliant = checkForStandard(pdfBoxDoc, &quot;PDF/UA&quot;);</span>
+<span class="nc" id="L264">            boolean isPdfBCompliant =</span>
+<span class="nc" id="L265">                    checkForStandard(</span>
+                            pdfBoxDoc,
+                            &quot;PDF/B&quot;); // If you want to check for PDF/Broadcast, though this isn't
+            // an official ISO standard.
+<span class="nc" id="L269">            boolean isPdfSECCompliant =</span>
+<span class="nc" id="L270">                    checkForStandard(</span>
+                            pdfBoxDoc,
+                            &quot;PDF/SEC&quot;); // This might not be effective since PDF/SEC was under
+            // development in 2021.
+
+<span class="nc" id="L275">            compliancy.put(&quot;IsPDF/ACompliant&quot;, isPdfACompliant);</span>
+<span class="nc" id="L276">            compliancy.put(&quot;IsPDF/XCompliant&quot;, isPdfXCompliant);</span>
+<span class="nc" id="L277">            compliancy.put(&quot;IsPDF/ECompliant&quot;, isPdfECompliant);</span>
+<span class="nc" id="L278">            compliancy.put(&quot;IsPDF/VTCompliant&quot;, isPdfVTCompliant);</span>
+<span class="nc" id="L279">            compliancy.put(&quot;IsPDF/UACompliant&quot;, isPdfUACompliant);</span>
+<span class="nc" id="L280">            compliancy.put(&quot;IsPDF/BCompliant&quot;, isPdfBCompliant);</span>
+<span class="nc" id="L281">            compliancy.put(&quot;IsPDF/SECCompliant&quot;, isPdfSECCompliant);</span>
+
+<span class="nc" id="L283">            PDOutlineNode root = pdfBoxDoc.getDocumentCatalog().getDocumentOutline();</span>
+<span class="nc" id="L284">            ArrayNode bookmarksArray = objectMapper.createArrayNode();</span>
+
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (root != null) {</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                for (PDOutlineItem child : root.children()) {</span>
+<span class="nc" id="L288">                    addOutlinesToArray(child, bookmarksArray);</span>
+<span class="nc" id="L289">                }</span>
+            }
+
+<span class="nc" id="L292">            other.set(&quot;Bookmarks/Outline/TOC&quot;, bookmarksArray);</span>
+
+<span class="nc" id="L294">            PDMetadata pdMetadata = pdfBoxDoc.getDocumentCatalog().getMetadata();</span>
+
+<span class="nc" id="L296">            String xmpString = null;</span>
+
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            if (pdMetadata != null) {</span>
+                try {
+<span class="nc" id="L300">                    COSInputStream is = pdMetadata.createInputStream();</span>
+<span class="nc" id="L301">                    DomXmpParser domXmpParser = new DomXmpParser();</span>
+<span class="nc" id="L302">                    XMPMetadata xmpMeta = domXmpParser.parse(is);</span>
+
+<span class="nc" id="L304">                    ByteArrayOutputStream os = new ByteArrayOutputStream();</span>
+<span class="nc" id="L305">                    new XmpSerializer().serialize(xmpMeta, os, true);</span>
+<span class="nc" id="L306">                    xmpString = new String(os.toByteArray(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L307">                } catch (XmpParsingException | IOException e) {</span>
+<span class="nc" id="L308">                    e.printStackTrace();</span>
+<span class="nc" id="L309">                }</span>
+            }
+
+<span class="nc" id="L312">            other.put(&quot;XMPMetadata&quot;, xmpString);</span>
+
+<span class="nc bnc" id="L314" title="All 2 branches missed.">            if (pdfBoxDoc.isEncrypted()) {</span>
+<span class="nc" id="L315">                encryption.put(&quot;IsEncrypted&quot;, true);</span>
+
+                // Retrieve encryption details using getEncryption()
+<span class="nc" id="L318">                PDEncryption pdfEncryption = pdfBoxDoc.getEncryption();</span>
+<span class="nc" id="L319">                encryption.put(&quot;EncryptionAlgorithm&quot;, pdfEncryption.getFilter());</span>
+<span class="nc" id="L320">                encryption.put(&quot;KeyLength&quot;, pdfEncryption.getLength());</span>
+<span class="nc" id="L321">                AccessPermission ap = pdfBoxDoc.getCurrentAccessPermission();</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                if (ap != null) {</span>
+<span class="nc" id="L323">                    ObjectNode permissionsNode = objectMapper.createObjectNode();</span>
+
+<span class="nc" id="L325">                    permissionsNode.put(&quot;CanAssembleDocument&quot;, ap.canAssembleDocument());</span>
+<span class="nc" id="L326">                    permissionsNode.put(&quot;CanExtractContent&quot;, ap.canExtractContent());</span>
+<span class="nc" id="L327">                    permissionsNode.put(</span>
+<span class="nc" id="L328">                            &quot;CanExtractForAccessibility&quot;, ap.canExtractForAccessibility());</span>
+<span class="nc" id="L329">                    permissionsNode.put(&quot;CanFillInForm&quot;, ap.canFillInForm());</span>
+<span class="nc" id="L330">                    permissionsNode.put(&quot;CanModify&quot;, ap.canModify());</span>
+<span class="nc" id="L331">                    permissionsNode.put(&quot;CanModifyAnnotations&quot;, ap.canModifyAnnotations());</span>
+<span class="nc" id="L332">                    permissionsNode.put(&quot;CanPrint&quot;, ap.canPrint());</span>
+
+<span class="nc" id="L334">                    encryption.set(</span>
+                            &quot;Permissions&quot;, permissionsNode); // set the node under &quot;Permissions&quot;
+                }
+                // Add other encryption-related properties as needed
+<span class="nc" id="L338">            } else {</span>
+<span class="nc" id="L339">                encryption.put(&quot;IsEncrypted&quot;, false);</span>
+            }
+
+<span class="nc" id="L342">            ObjectNode pageInfoParent = objectMapper.createObjectNode();</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            for (int pageNum = 0; pageNum &lt; pdfBoxDoc.getNumberOfPages(); pageNum++) {</span>
+<span class="nc" id="L344">                ObjectNode pageInfo = objectMapper.createObjectNode();</span>
+
+                // Retrieve the page
+<span class="nc" id="L347">                PDPage page = pdfBoxDoc.getPage(pageNum);</span>
+
+                // Page-level Information
+<span class="nc" id="L350">                PDRectangle mediaBox = page.getMediaBox();</span>
+
+<span class="nc" id="L352">                float width = mediaBox.getWidth();</span>
+<span class="nc" id="L353">                float height = mediaBox.getHeight();</span>
+
+<span class="nc" id="L355">                ObjectNode sizeInfo = objectMapper.createObjectNode();</span>
+
+<span class="nc" id="L357">                getDimensionInfo(sizeInfo, width, height);</span>
+
+<span class="nc" id="L359">                sizeInfo.put(&quot;Standard Page&quot;, getPageSize(width, height));</span>
+<span class="nc" id="L360">                pageInfo.set(&quot;Size&quot;, sizeInfo);</span>
+
+<span class="nc" id="L362">                pageInfo.put(&quot;Rotation&quot;, page.getRotation());</span>
+<span class="nc" id="L363">                pageInfo.put(&quot;Page Orientation&quot;, getPageOrientation(width, height));</span>
+
+                // Boxes
+<span class="nc" id="L366">                pageInfo.put(&quot;MediaBox&quot;, mediaBox.toString());</span>
+
+                // Assuming the following boxes are defined for your document; if not, you may get
+                // null values.
+<span class="nc" id="L370">                PDRectangle cropBox = page.getCropBox();</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">                pageInfo.put(&quot;CropBox&quot;, cropBox == null ? &quot;Undefined&quot; : cropBox.toString());</span>
+
+<span class="nc" id="L373">                PDRectangle bleedBox = page.getBleedBox();</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">                pageInfo.put(&quot;BleedBox&quot;, bleedBox == null ? &quot;Undefined&quot; : bleedBox.toString());</span>
+
+<span class="nc" id="L376">                PDRectangle trimBox = page.getTrimBox();</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">                pageInfo.put(&quot;TrimBox&quot;, trimBox == null ? &quot;Undefined&quot; : trimBox.toString());</span>
+
+<span class="nc" id="L379">                PDRectangle artBox = page.getArtBox();</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">                pageInfo.put(&quot;ArtBox&quot;, artBox == null ? &quot;Undefined&quot; : artBox.toString());</span>
+
+                // Content Extraction
+<span class="nc" id="L383">                PDFTextStripper textStripper = new PDFTextStripper();</span>
+<span class="nc" id="L384">                textStripper.setStartPage(pageNum + 1);</span>
+<span class="nc" id="L385">                textStripper.setEndPage(pageNum + 1);</span>
+<span class="nc" id="L386">                String pageText = textStripper.getText(pdfBoxDoc);</span>
+
+<span class="nc" id="L388">                pageInfo.put(&quot;Text Characters Count&quot;, pageText.length()); //</span>
+
+                // Annotations
+
+<span class="nc" id="L392">                List&lt;PDAnnotation&gt; annotations = page.getAnnotations();</span>
+
+<span class="nc" id="L394">                int subtypeCount = 0;</span>
+<span class="nc" id="L395">                int contentsCount = 0;</span>
+
+<span class="nc bnc" id="L397" title="All 2 branches missed.">                for (PDAnnotation annotation : annotations) {</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                    if (annotation.getSubtype() != null) {</span>
+<span class="nc" id="L399">                        subtypeCount++; // Increase subtype count</span>
+                    }
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                    if (annotation.getContents() != null) {</span>
+<span class="nc" id="L402">                        contentsCount++; // Increase contents count</span>
+                    }
+<span class="nc" id="L404">                }</span>
+
+<span class="nc" id="L406">                ObjectNode annotationsObject = objectMapper.createObjectNode();</span>
+<span class="nc" id="L407">                annotationsObject.put(&quot;AnnotationsCount&quot;, annotations.size());</span>
+<span class="nc" id="L408">                annotationsObject.put(&quot;SubtypeCount&quot;, subtypeCount);</span>
+<span class="nc" id="L409">                annotationsObject.put(&quot;ContentsCount&quot;, contentsCount);</span>
+<span class="nc" id="L410">                pageInfo.set(&quot;Annotations&quot;, annotationsObject);</span>
+
+                // Images (simplified)
+                // This part is non-trivial as images can be embedded in multiple ways in a PDF.
+                // Here is a basic structure to recognize image XObjects on a page.
+<span class="nc" id="L415">                ArrayNode imagesArray = objectMapper.createArrayNode();</span>
+<span class="nc" id="L416">                PDResources resources = page.getResources();</span>
+
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                for (COSName name : resources.getXObjectNames()) {</span>
+<span class="nc" id="L419">                    PDXObject xObject = resources.getXObject(name);</span>
+<span class="nc bnc" id="L420" title="All 2 branches missed.">                    if (xObject instanceof PDImageXObject) {</span>
+<span class="nc" id="L421">                        PDImageXObject image = (PDImageXObject) xObject;</span>
+
+<span class="nc" id="L423">                        ObjectNode imageNode = objectMapper.createObjectNode();</span>
+<span class="nc" id="L424">                        imageNode.put(&quot;Width&quot;, image.getWidth());</span>
+<span class="nc" id="L425">                        imageNode.put(&quot;Height&quot;, image.getHeight());</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">                        if (image.getMetadata() != null</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">                                &amp;&amp; image.getMetadata().getFile() != null</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                                &amp;&amp; image.getMetadata().getFile().getFile() != null) {</span>
+<span class="nc" id="L429">                            imageNode.put(&quot;Name&quot;, image.getMetadata().getFile().getFile());</span>
+                        }
+<span class="nc bnc" id="L431" title="All 2 branches missed.">                        if (image.getColorSpace() != null) {</span>
+<span class="nc" id="L432">                            imageNode.put(&quot;ColorSpace&quot;, image.getColorSpace().getName());</span>
+                        }
+
+<span class="nc" id="L435">                        imagesArray.add(imageNode);</span>
+                    }
+<span class="nc" id="L437">                }</span>
+<span class="nc" id="L438">                pageInfo.set(&quot;Images&quot;, imagesArray);</span>
+
+                // Links
+<span class="nc" id="L441">                ArrayNode linksArray = objectMapper.createArrayNode();</span>
+<span class="nc" id="L442">                Set&lt;String&gt; uniqueURIs = new HashSet&lt;&gt;(); // To store unique URIs</span>
+
+<span class="nc bnc" id="L444" title="All 2 branches missed.">                for (PDAnnotation annotation : annotations) {</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">                    if (annotation instanceof PDAnnotationLink) {</span>
+<span class="nc" id="L446">                        PDAnnotationLink linkAnnotation = (PDAnnotationLink) annotation;</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">                        if (linkAnnotation.getAction() instanceof PDActionURI) {</span>
+<span class="nc" id="L448">                            PDActionURI uriAction = (PDActionURI) linkAnnotation.getAction();</span>
+<span class="nc" id="L449">                            String uri = uriAction.getURI();</span>
+<span class="nc" id="L450">                            uniqueURIs.add(uri); // Add to set to ensure uniqueness</span>
+                        }
+                    }
+<span class="nc" id="L453">                }</span>
+
+                // Add unique URIs to linksArray
+<span class="nc bnc" id="L456" title="All 2 branches missed.">                for (String uri : uniqueURIs) {</span>
+<span class="nc" id="L457">                    ObjectNode linkNode = objectMapper.createObjectNode();</span>
+<span class="nc" id="L458">                    linkNode.put(&quot;URI&quot;, uri);</span>
+<span class="nc" id="L459">                    linksArray.add(linkNode);</span>
+<span class="nc" id="L460">                }</span>
+<span class="nc" id="L461">                pageInfo.set(&quot;Links&quot;, linksArray);</span>
+
+                // Fonts
+<span class="nc" id="L464">                ArrayNode fontsArray = objectMapper.createArrayNode();</span>
+<span class="nc" id="L465">                Map&lt;String, ObjectNode&gt; uniqueFontsMap = new HashMap&lt;&gt;();</span>
+
+<span class="nc bnc" id="L467" title="All 2 branches missed.">                for (COSName fontName : resources.getFontNames()) {</span>
+<span class="nc" id="L468">                    PDFont font = resources.getFont(fontName);</span>
+<span class="nc" id="L469">                    ObjectNode fontNode = objectMapper.createObjectNode();</span>
+
+<span class="nc" id="L471">                    fontNode.put(&quot;IsEmbedded&quot;, font.isEmbedded());</span>
+
+                    // PDFBox provides Font's BaseFont (i.e., the font name) directly
+<span class="nc" id="L474">                    fontNode.put(&quot;Name&quot;, font.getName());</span>
+
+<span class="nc" id="L476">                    fontNode.put(&quot;Subtype&quot;, font.getType());</span>
+
+<span class="nc" id="L478">                    PDFontDescriptor fontDescriptor = font.getFontDescriptor();</span>
+
+<span class="nc bnc" id="L480" title="All 2 branches missed.">                    if (fontDescriptor != null) {</span>
+<span class="nc" id="L481">                        fontNode.put(&quot;ItalicAngle&quot;, fontDescriptor.getItalicAngle());</span>
+<span class="nc" id="L482">                        int flags = fontDescriptor.getFlags();</span>
+<span class="nc bnc" id="L483" title="All 2 branches missed.">                        fontNode.put(&quot;IsItalic&quot;, (flags &amp; 1) != 0);</span>
+<span class="nc bnc" id="L484" title="All 2 branches missed.">                        fontNode.put(&quot;IsBold&quot;, (flags &amp; 64) != 0);</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">                        fontNode.put(&quot;IsFixedPitch&quot;, (flags &amp; 2) != 0);</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">                        fontNode.put(&quot;IsSerif&quot;, (flags &amp; 4) != 0);</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">                        fontNode.put(&quot;IsSymbolic&quot;, (flags &amp; 8) != 0);</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">                        fontNode.put(&quot;IsScript&quot;, (flags &amp; 16) != 0);</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">                        fontNode.put(&quot;IsNonsymbolic&quot;, (flags &amp; 32) != 0);</span>
+
+<span class="nc" id="L491">                        fontNode.put(&quot;FontFamily&quot;, fontDescriptor.getFontFamily());</span>
+                        // Font stretch and BBox are not directly available in PDFBox's API, so
+                        // these are omitted for simplicity
+<span class="nc" id="L494">                        fontNode.put(&quot;FontWeight&quot;, fontDescriptor.getFontWeight());</span>
+                    }
+
+                    // Create a unique key for this font node based on its attributes
+<span class="nc" id="L498">                    String uniqueKey = fontNode.toString();</span>
+
+                    // Increment count if this font exists, or initialize it if new
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                    if (uniqueFontsMap.containsKey(uniqueKey)) {</span>
+<span class="nc" id="L502">                        ObjectNode existingFontNode = uniqueFontsMap.get(uniqueKey);</span>
+<span class="nc" id="L503">                        int count = existingFontNode.get(&quot;Count&quot;).asInt() + 1;</span>
+<span class="nc" id="L504">                        existingFontNode.put(&quot;Count&quot;, count);</span>
+<span class="nc" id="L505">                    } else {</span>
+<span class="nc" id="L506">                        fontNode.put(&quot;Count&quot;, 1);</span>
+<span class="nc" id="L507">                        uniqueFontsMap.put(uniqueKey, fontNode);</span>
+                    }
+<span class="nc" id="L509">                }</span>
+
+                // Add unique font entries to fontsArray
+<span class="nc bnc" id="L512" title="All 2 branches missed.">                for (ObjectNode uniqueFontNode : uniqueFontsMap.values()) {</span>
+<span class="nc" id="L513">                    fontsArray.add(uniqueFontNode);</span>
+<span class="nc" id="L514">                }</span>
+
+<span class="nc" id="L516">                pageInfo.set(&quot;Fonts&quot;, fontsArray);</span>
+
+                // Access resources dictionary
+<span class="nc" id="L519">                ArrayNode colorSpacesArray = objectMapper.createArrayNode();</span>
+
+<span class="nc" id="L521">                Iterable&lt;COSName&gt; colorSpaceNames = resources.getColorSpaceNames();</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">                for (COSName name : colorSpaceNames) {</span>
+<span class="nc" id="L523">                    PDColorSpace colorSpace = resources.getColorSpace(name);</span>
+<span class="nc bnc" id="L524" title="All 2 branches missed.">                    if (colorSpace instanceof PDICCBased) {</span>
+<span class="nc" id="L525">                        PDICCBased iccBased = (PDICCBased) colorSpace;</span>
+<span class="nc" id="L526">                        PDStream iccData = iccBased.getPDStream();</span>
+<span class="nc" id="L527">                        byte[] iccBytes = iccData.toByteArray();</span>
+
+                        // TODO: Further decode and analyze the ICC data if needed
+<span class="nc" id="L530">                        ObjectNode iccProfileNode = objectMapper.createObjectNode();</span>
+<span class="nc" id="L531">                        iccProfileNode.put(&quot;ICC Profile Length&quot;, iccBytes.length);</span>
+<span class="nc" id="L532">                        colorSpacesArray.add(iccProfileNode);</span>
+                    }
+<span class="nc" id="L534">                }</span>
+<span class="nc" id="L535">                pageInfo.set(&quot;Color Spaces &amp; ICC Profiles&quot;, colorSpacesArray);</span>
+
+                // Other XObjects
+<span class="nc" id="L538">                Map&lt;String, Integer&gt; xObjectCountMap =</span>
+                        new HashMap&lt;&gt;(); // To store the count for each type
+<span class="nc bnc" id="L540" title="All 2 branches missed.">                for (COSName name : resources.getXObjectNames()) {</span>
+<span class="nc" id="L541">                    PDXObject xObject = resources.getXObject(name);</span>
+                    String xObjectType;
+
+<span class="nc bnc" id="L544" title="All 2 branches missed.">                    if (xObject instanceof PDImageXObject) {</span>
+<span class="nc" id="L545">                        xObjectType = &quot;Image&quot;;</span>
+<span class="nc bnc" id="L546" title="All 2 branches missed.">                    } else if (xObject instanceof PDFormXObject) {</span>
+<span class="nc" id="L547">                        xObjectType = &quot;Form&quot;;</span>
+                    } else {
+<span class="nc" id="L549">                        xObjectType = &quot;Other&quot;;</span>
+                    }
+
+                    // Increment the count for this type in the map
+<span class="nc" id="L553">                    xObjectCountMap.put(</span>
+<span class="nc" id="L554">                            xObjectType, xObjectCountMap.getOrDefault(xObjectType, 0) + 1);</span>
+<span class="nc" id="L555">                }</span>
+
+                // Add the count map to pageInfo (or wherever you want to store it)
+<span class="nc" id="L558">                ObjectNode xObjectCountNode = objectMapper.createObjectNode();</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">                for (Map.Entry&lt;String, Integer&gt; entry : xObjectCountMap.entrySet()) {</span>
+<span class="nc" id="L560">                    xObjectCountNode.put(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L561">                }</span>
+<span class="nc" id="L562">                pageInfo.set(&quot;XObjectCounts&quot;, xObjectCountNode);</span>
+
+<span class="nc" id="L564">                ArrayNode multimediaArray = objectMapper.createArrayNode();</span>
+
+<span class="nc bnc" id="L566" title="All 2 branches missed.">                for (PDAnnotation annotation : annotations) {</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">                    if (&quot;RichMedia&quot;.equals(annotation.getSubtype())) {</span>
+<span class="nc" id="L568">                        ObjectNode multimediaNode = objectMapper.createObjectNode();</span>
+                        // Extract details from the annotation as needed
+<span class="nc" id="L570">                        multimediaArray.add(multimediaNode);</span>
+                    }
+<span class="nc" id="L572">                }</span>
+
+<span class="nc" id="L574">                pageInfo.set(&quot;Multimedia&quot;, multimediaArray);</span>
+
+<span class="nc" id="L576">                pageInfoParent.set(&quot;Page &quot; + (pageNum + 1), pageInfo);</span>
+            }
+
+<span class="nc" id="L579">            jsonOutput.set(&quot;BasicInfo&quot;, basicInfo);</span>
+<span class="nc" id="L580">            jsonOutput.set(&quot;DocumentInfo&quot;, docInfoNode);</span>
+<span class="nc" id="L581">            jsonOutput.set(&quot;Compliancy&quot;, compliancy);</span>
+<span class="nc" id="L582">            jsonOutput.set(&quot;Encryption&quot;, encryption);</span>
+<span class="nc" id="L583">            jsonOutput.set(&quot;Other&quot;, other);</span>
+<span class="nc" id="L584">            jsonOutput.set(&quot;PerPageInfo&quot;, pageInfoParent);</span>
+
+            // Save JSON to file
+<span class="nc" id="L587">            String jsonString =</span>
+<span class="nc" id="L588">                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonOutput);</span>
+
+<span class="nc" id="L590">            return WebResponseUtils.bytesToWebResponse(</span>
+<span class="nc" id="L591">                    jsonString.getBytes(StandardCharsets.UTF_8),</span>
+                    &quot;response.json&quot;,
+                    MediaType.APPLICATION_JSON);
+
+<span class="nc" id="L595">        } catch (Exception e) {</span>
+<span class="nc" id="L596">            e.printStackTrace();</span>
+        }
+<span class="nc" id="L598">        return null;</span>
+    }
+
+    private static void addOutlinesToArray(PDOutlineItem outline, ArrayNode arrayNode) {
+<span class="nc bnc" id="L602" title="All 2 branches missed.">        if (outline == null) return;</span>
+
+<span class="nc" id="L604">        ObjectNode outlineNode = objectMapper.createObjectNode();</span>
+<span class="nc" id="L605">        outlineNode.put(&quot;Title&quot;, outline.getTitle());</span>
+        // You can add other properties if needed
+<span class="nc" id="L607">        arrayNode.add(outlineNode);</span>
+
+<span class="nc" id="L609">        PDOutlineItem child = outline.getFirstChild();</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">        while (child != null) {</span>
+<span class="nc" id="L611">            addOutlinesToArray(child, arrayNode);</span>
+<span class="nc" id="L612">            child = child.getNextSibling();</span>
+        }
+<span class="nc" id="L614">    }</span>
+
+    public String getPageOrientation(double width, double height) {
+<span class="nc bnc" id="L617" title="All 2 branches missed.">        if (width &gt; height) {</span>
+<span class="nc" id="L618">            return &quot;Landscape&quot;;</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">        } else if (height &gt; width) {</span>
+<span class="nc" id="L620">            return &quot;Portrait&quot;;</span>
+        } else {
+<span class="nc" id="L622">            return &quot;Square&quot;;</span>
+        }
+    }
+
+    public String getPageSize(float width, float height) {
+        // Define standard page sizes
+<span class="nc" id="L628">        Map&lt;String, PDRectangle&gt; standardSizes = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L629">        standardSizes.put(&quot;Letter&quot;, PDRectangle.LETTER);</span>
+<span class="nc" id="L630">        standardSizes.put(&quot;LEGAL&quot;, PDRectangle.LEGAL);</span>
+<span class="nc" id="L631">        standardSizes.put(&quot;A0&quot;, PDRectangle.A0);</span>
+<span class="nc" id="L632">        standardSizes.put(&quot;A1&quot;, PDRectangle.A1);</span>
+<span class="nc" id="L633">        standardSizes.put(&quot;A2&quot;, PDRectangle.A2);</span>
+<span class="nc" id="L634">        standardSizes.put(&quot;A3&quot;, PDRectangle.A3);</span>
+<span class="nc" id="L635">        standardSizes.put(&quot;A4&quot;, PDRectangle.A4);</span>
+<span class="nc" id="L636">        standardSizes.put(&quot;A5&quot;, PDRectangle.A5);</span>
+<span class="nc" id="L637">        standardSizes.put(&quot;A6&quot;, PDRectangle.A6);</span>
+
+<span class="nc bnc" id="L639" title="All 2 branches missed.">        for (Map.Entry&lt;String, PDRectangle&gt; entry : standardSizes.entrySet()) {</span>
+<span class="nc" id="L640">            PDRectangle size = entry.getValue();</span>
+<span class="nc bnc" id="L641" title="All 2 branches missed.">            if (isCloseToSize(width, height, size.getWidth(), size.getHeight())) {</span>
+<span class="nc" id="L642">                return entry.getKey();</span>
+            }
+<span class="nc" id="L644">        }</span>
+<span class="nc" id="L645">        return &quot;Custom&quot;;</span>
+    }
+
+    private boolean isCloseToSize(
+            float width, float height, float standardWidth, float standardHeight) {
+<span class="nc" id="L650">        float tolerance = 1.0f; // You can adjust the tolerance as needed</span>
+<span class="nc bnc" id="L651" title="All 2 branches missed.">        return Math.abs(width - standardWidth) &lt;= tolerance</span>
+<span class="nc bnc" id="L652" title="All 2 branches missed.">                &amp;&amp; Math.abs(height - standardHeight) &lt;= tolerance;</span>
+    }
+
+    public ObjectNode getDimensionInfo(ObjectNode dimensionInfo, float width, float height) {
+<span class="nc" id="L656">        float ppi = 72; // Points Per Inch</span>
+
+<span class="nc" id="L658">        float widthInInches = width / ppi;</span>
+<span class="nc" id="L659">        float heightInInches = height / ppi;</span>
+
+<span class="nc" id="L661">        float widthInCm = widthInInches * 2.54f;</span>
+<span class="nc" id="L662">        float heightInCm = heightInInches * 2.54f;</span>
+
+<span class="nc" id="L664">        dimensionInfo.put(&quot;Width (px)&quot;, String.format(&quot;%.2f&quot;, width));</span>
+<span class="nc" id="L665">        dimensionInfo.put(&quot;Height (px)&quot;, String.format(&quot;%.2f&quot;, height));</span>
+<span class="nc" id="L666">        dimensionInfo.put(&quot;Width (in)&quot;, String.format(&quot;%.2f&quot;, widthInInches));</span>
+<span class="nc" id="L667">        dimensionInfo.put(&quot;Height (in)&quot;, String.format(&quot;%.2f&quot;, heightInInches));</span>
+<span class="nc" id="L668">        dimensionInfo.put(&quot;Width (cm)&quot;, String.format(&quot;%.2f&quot;, widthInCm));</span>
+<span class="nc" id="L669">        dimensionInfo.put(&quot;Height (cm)&quot;, String.format(&quot;%.2f&quot;, heightInCm));</span>
+<span class="nc" id="L670">        return dimensionInfo;</span>
+    }
+
+    public static boolean checkForStandard(PDDocument document, String standardKeyword) {
+        // Check XMP Metadata
+        try {
+<span class="nc" id="L676">            PDMetadata pdMetadata = document.getDocumentCatalog().getMetadata();</span>
+<span class="nc bnc" id="L677" title="All 2 branches missed.">            if (pdMetadata != null) {</span>
+<span class="nc" id="L678">                COSInputStream metaStream = pdMetadata.createInputStream();</span>
+<span class="nc" id="L679">                DomXmpParser domXmpParser = new DomXmpParser();</span>
+<span class="nc" id="L680">                XMPMetadata xmpMeta = domXmpParser.parse(metaStream);</span>
+
+<span class="nc" id="L682">                ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L683">                new XmpSerializer().serialize(xmpMeta, baos, true);</span>
+<span class="nc" id="L684">                String xmpString = new String(baos.toByteArray(), StandardCharsets.UTF_8);</span>
+
+<span class="nc bnc" id="L686" title="All 2 branches missed.">                if (xmpString.contains(standardKeyword)) {</span>
+<span class="nc" id="L687">                    return true;</span>
+                }
+            }
+<span class="nc" id="L690">        } catch (</span>
+                Exception
+                        e) { // Catching general exception for brevity, ideally you'd catch specific
+            // exceptions.
+<span class="nc" id="L694">            e.printStackTrace();</span>
+<span class="nc" id="L695">        }</span>
+
+<span class="nc" id="L697">        return false;</span>
+    }
+
+    public ArrayNode exploreStructureTree(List&lt;Object&gt; nodes) {
+<span class="nc" id="L701">        ArrayNode elementsArray = objectMapper.createArrayNode();</span>
+<span class="nc bnc" id="L702" title="All 2 branches missed.">        if (nodes != null) {</span>
+<span class="nc bnc" id="L703" title="All 2 branches missed.">            for (Object obj : nodes) {</span>
+<span class="nc bnc" id="L704" title="All 2 branches missed.">                if (obj instanceof PDStructureNode) {</span>
+<span class="nc" id="L705">                    PDStructureNode node = (PDStructureNode) obj;</span>
+<span class="nc" id="L706">                    ObjectNode elementNode = objectMapper.createObjectNode();</span>
+
+<span class="nc bnc" id="L708" title="All 2 branches missed.">                    if (node instanceof PDStructureElement) {</span>
+<span class="nc" id="L709">                        PDStructureElement structureElement = (PDStructureElement) node;</span>
+<span class="nc" id="L710">                        elementNode.put(&quot;Type&quot;, structureElement.getStructureType());</span>
+<span class="nc" id="L711">                        elementNode.put(&quot;Content&quot;, getContent(structureElement));</span>
+
+                        // Recursively explore child elements
+<span class="nc" id="L714">                        ArrayNode childElements = exploreStructureTree(structureElement.getKids());</span>
+<span class="nc bnc" id="L715" title="All 2 branches missed.">                        if (childElements.size() &gt; 0) {</span>
+<span class="nc" id="L716">                            elementNode.set(&quot;Children&quot;, childElements);</span>
+                        }
+                    }
+<span class="nc" id="L719">                    elementsArray.add(elementNode);</span>
+                }
+<span class="nc" id="L721">            }</span>
+        }
+<span class="nc" id="L723">        return elementsArray;</span>
+    }
+
+    public String getContent(PDStructureElement structureElement) {
+<span class="nc" id="L727">        StringBuilder contentBuilder = new StringBuilder();</span>
+
+<span class="nc bnc" id="L729" title="All 2 branches missed.">        for (Object item : structureElement.getKids()) {</span>
+<span class="nc bnc" id="L730" title="All 2 branches missed.">            if (item instanceof COSString) {</span>
+<span class="nc" id="L731">                COSString cosString = (COSString) item;</span>
+<span class="nc" id="L732">                contentBuilder.append(cosString.getString());</span>
+<span class="nc bnc" id="L733" title="All 2 branches missed.">            } else if (item instanceof PDStructureElement) {</span>
+                // For simplicity, we're handling only COSString and PDStructureElement here
+                // but a more comprehensive method would handle other types too
+<span class="nc" id="L736">                contentBuilder.append(getContent((PDStructureElement) item));</span>
+            }
+<span class="nc" id="L738">        }</span>
+
+<span class="nc" id="L740">        return contentBuilder.toString();</span>
+    }
+
+    private String formatDate(Calendar calendar) {
+<span class="nc bnc" id="L744" title="All 2 branches missed.">        if (calendar != null) {</span>
+<span class="nc" id="L745">            SimpleDateFormat sdf = new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss&quot;);</span>
+<span class="nc" id="L746">            return sdf.format(calendar.getTime());</span>
+        } else {
+<span class="nc" id="L748">            return null;</span>
+        }
+    }
+
+    private String getPageModeDescription(String pageMode) {
+<span class="nc bnc" id="L753" title="All 2 branches missed.">        return pageMode != null ? pageMode.toString().replaceFirst(&quot;/&quot;, &quot;&quot;) : &quot;Unknown&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>
